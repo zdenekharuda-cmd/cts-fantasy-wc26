@@ -32,7 +32,7 @@ app.use(
     }
   })
 );
-app.use(express.static(path.resolve(__dirname, '..', 'public')));
+app.use(express.static(__dirname));
 
 function publicUser(user) {
   if (!user) return null;
