@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-export const DEFAULT_DATA_DIR = path.resolve(__dirname, '..', 'data');
+export const DEFAULT_DATA_DIR = __dirname;
 export const DATA_DIR = process.env.DATA_DIR ? path.resolve(process.env.DATA_DIR) : DEFAULT_DATA_DIR;
 
 async function ensureDataDir() {
