@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Scoreboard | CTS fantasy WC '26</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flag-icons/css/flag-icons.min.css">
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="logo">CTS fantasy WC '26</div>
+    <nav class="nav" data-nav></nav>
+  </header>
+  <main class="container">
+    <section class="card">
+      <div class="toolbar">
+        <div>
+          <h1>Scoreboard</h1>
+          <p id="summary">Loading...</p>
+        </div>
+        <button id="refreshBtn">Refresh</button>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Nickname</th>
+              <th>Name</th>
+              <th>Total points</th>
+              <th>Exact scores</th>
+              <th>Scored tips</th>
+            </tr>
+          </thead>
+          <tbody id="scoreRows"></tbody>
+        </table>
+      </div>
+    </section>
+  </main>
+  <script type="module">
+    import { api, escapeHtml } from '/common.js';
+
+    const rows = document.getElementById('scoreRows');
+    const summary = document.getElementById('summary');
+    const refreshBtn = document.getElementById('refreshBtn');
+
+    async function load() {
+      const data = await api('/api/scoreboard');
+      summary.textContent = `${data.finishedMatches} finished matches counted.`;
+      if (!data.users.length) {
+        rows.innerHTML = `<tr><td colspan="6" class="muted">No users yet.</td></tr>`;
+        return;
+      }
+      rows.innerHTML = data.users.map((user, index) => `
+        <tr>
+          <td class="rank">${index + 1}</td>
+          <td><b>${escapeHtml(user.nickname)}</b></td>
+          <td>${escapeHtml(user.name)}</td>
+          <td class="points">${user.totalPoints}</td>
+          <td>${user.exactScores}</td>
+          <td>${user.scoredTips}</td>
+        </tr>
+      `).join('');
+    }
+
+    refreshBtn.addEventListener('click', load);
+    await load();
+  </script>
+</body>
+</html>

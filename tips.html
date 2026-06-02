@@ -1,0 +1,117 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Tip | CTS fantasy WC '26</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flag-icons/css/flag-icons.min.css">
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="logo">CTS fantasy WC '26</div>
+    <nav class="nav" data-nav></nav>
+  </header>
+  <main class="container">
+    <div class="toolbar">
+      <div>
+        <h1>Tip</h1>
+        <p>Enter or update your score prediction until 5 minutes before kick-off.</p>
+      </div>
+      <input id="filterInput" placeholder="Filter team, city, round...">
+    </div>
+    <div id="matches" class="match-list"></div>
+  </main>
+  <script type="module">
+    import { api, escapeHtml, flagSpan, formatKickoff, requireLogin, setMessage } from '/common.js';
+
+    const list = document.getElementById('matches');
+    const filterInput = document.getElementById('filterInput');
+    let matches = [];
+
+    function render() {
+      const filter = filterInput.value.trim().toLowerCase();
+      const visible = matches.filter((match) => {
+        const text = `${match.teamHome} ${match.teamAway} ${match.venue} ${match.round} ${match.group || ''}`.toLowerCase();
+        return !filter || text.includes(filter);
+      });
+
+      if (!visible.length) {
+        list.innerHTML = `<div class="empty">No matches found. If this is a fresh installation, run <b>npm run sync:matches</b> first.</div>`;
+        return;
+      }
+
+      list.innerHTML = visible.map((match) => matchCard(match)).join('');
+      document.querySelectorAll('[data-tip-form]').forEach((form) => {
+        form.addEventListener('submit', submitTip);
+      });
+    }
+
+    function matchCard(match) {
+      const statusClass = match.finished ? 'finished' : match.locked ? 'locked' : '';
+      const statusLabel = match.finished ? `Finished ${match.homeScore}:${match.awayScore}` : match.locked ? 'Locked' : 'Open';
+      const tip = match.tip || {};
+      const disabled = match.locked || match.finished ? 'disabled' : '';
+      const points = match.tip?.points ?? null;
+      const tipNote = match.finished && match.tip
+        ? `Your tip: ${tip.homeScore}:${tip.awayScore} · ${points} point${points === 1 ? '' : 's'}`
+        : match.tip
+          ? `Saved tip: ${tip.homeScore}:${tip.awayScore}`
+          : match.locked
+            ? 'No changes allowed now.'
+            : 'No tip saved yet.';
+
+      return `
+        <article class="match-card ${match.locked ? 'locked' : ''}">
+          <div>
+            <span class="badge ${statusClass}">${escapeHtml(statusLabel)}</span>
+            <div class="teams">
+              <div class="team">${flagSpan(match.homeFlag)} <span>${escapeHtml(match.teamHome)}</span></div>
+              <div class="team">${flagSpan(match.awayFlag)} <span>${escapeHtml(match.teamAway)}</span></div>
+            </div>
+          </div>
+          <div class="details">
+            <b>${escapeHtml(match.round)}</b>${match.group ? ` · ${escapeHtml(match.group)}` : ''}<br>
+            ${escapeHtml(formatKickoff(match.kickoffUtc))}<br>
+            ${escapeHtml(match.venue)}
+          </div>
+          <form class="tip-form" data-tip-form data-match-id="${match.id}">
+            <input type="number" min="0" max="99" name="homeScore" value="${tip.homeScore ?? ''}" ${disabled} required aria-label="Home score">
+            <span class="dash">:</span>
+            <input type="number" min="0" max="99" name="awayScore" value="${tip.awayScore ?? ''}" ${disabled} required aria-label="Away score">
+            <button type="submit" ${disabled}>Save tip</button>
+            <div class="tip-note" id="tip-note-${match.id}">${escapeHtml(tipNote)}</div>
+          </form>
+        </article>`;
+    }
+
+    async function submitTip(event) {
+      event.preventDefault();
+      const form = event.currentTarget;
+      const matchId = form.dataset.matchId;
+      const note = document.getElementById(`tip-note-${matchId}`);
+      const body = Object.fromEntries(new FormData(form));
+
+      try {
+        await api(`/api/tips/${matchId}`, { method: 'POST', body });
+        setMessage(note, 'Saved.', 'success');
+        await loadMatches(false);
+      } catch (error) {
+        setMessage(note, error.message, 'error');
+      }
+    }
+
+    async function loadMatches(showLoading = true) {
+      if (showLoading) list.innerHTML = `<div class="empty">Loading matches...</div>`;
+      const data = await api('/api/matches');
+      matches = data.matches;
+      render();
+    }
+
+    filterInput.addEventListener('input', render);
+
+    await requireLogin();
+    await loadMatches();
+  </script>
+</body>
+</html>

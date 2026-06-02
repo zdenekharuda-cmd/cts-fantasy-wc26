@@ -1,0 +1,130 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Admin | CTS fantasy WC '26</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flag-icons/css/flag-icons.min.css">
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="logo">CTS fantasy WC '26</div>
+    <nav class="nav" data-nav></nav>
+  </header>
+  <main class="container">
+    <section class="card">
+      <h1>Admin</h1>
+      <p>Optional page for syncing fixtures/results and entering final scores manually.</p>
+      <label for="adminToken">Admin token</label>
+      <input id="adminToken" type="password" placeholder="ADMIN_TOKEN from .env">
+      <div class="form-actions">
+        <button id="saveTokenBtn">Save token in this browser</button>
+        <button id="syncBtn">Sync from OpenFootball</button>
+      </div>
+      <div id="message" class="message"></div>
+    </section>
+    <section class="card" style="margin-top:18px;">
+      <div class="toolbar">
+        <h2>Final score entry</h2>
+        <input id="filterInput" placeholder="Filter team, city, round...">
+      </div>
+      <div id="matches" class="match-list"></div>
+    </section>
+  </main>
+  <script type="module">
+    import { api, escapeHtml, flagSpan, formatKickoff, requireLogin, setMessage } from '/common.js';
+
+    const tokenInput = document.getElementById('adminToken');
+    const saveTokenBtn = document.getElementById('saveTokenBtn');
+    const syncBtn = document.getElementById('syncBtn');
+    const message = document.getElementById('message');
+    const list = document.getElementById('matches');
+    const filterInput = document.getElementById('filterInput');
+    let matches = [];
+
+    tokenInput.value = localStorage.getItem('ctsAdminToken') || '';
+    saveTokenBtn.addEventListener('click', () => {
+      localStorage.setItem('ctsAdminToken', tokenInput.value);
+      setMessage(message, 'Admin token saved in this browser.', 'success');
+    });
+
+    function adminHeaders() {
+      return { 'x-admin-token': tokenInput.value };
+    }
+
+    syncBtn.addEventListener('click', async () => {
+      try {
+        const result = await api('/api/admin/sync', { method: 'POST', headers: adminHeaders() });
+        setMessage(message, `Synced ${result.count} matches (${result.finished} finished).`, 'success');
+        await loadMatches();
+      } catch (error) {
+        setMessage(message, error.message, 'error');
+      }
+    });
+
+    function render() {
+      const filter = filterInput.value.trim().toLowerCase();
+      const visible = matches.filter((match) => {
+        const text = `${match.teamHome} ${match.teamAway} ${match.venue} ${match.round} ${match.group || ''}`.toLowerCase();
+        return !filter || text.includes(filter);
+      });
+
+      if (!visible.length) {
+        list.innerHTML = `<div class="empty">No matches found.</div>`;
+        return;
+      }
+
+      list.innerHTML = visible.map((match) => `
+        <article class="match-card">
+          <div class="teams">
+            <div class="team">${flagSpan(match.homeFlag)} <span>${escapeHtml(match.teamHome)}</span></div>
+            <div class="team">${flagSpan(match.awayFlag)} <span>${escapeHtml(match.teamAway)}</span></div>
+          </div>
+          <div class="details">
+            <b>${escapeHtml(match.round)}</b>${match.group ? ` · ${escapeHtml(match.group)}` : ''}<br>
+            ${escapeHtml(formatKickoff(match.kickoffUtc))}<br>
+            ${escapeHtml(match.venue)}<br>
+            Current status: <b>${escapeHtml(match.status)}</b>
+          </div>
+          <form class="tip-form" data-result-form data-match-id="${match.id}">
+            <input type="number" min="0" max="99" name="homeScore" value="${match.homeScore ?? ''}" required aria-label="Home final score">
+            <span class="dash">:</span>
+            <input type="number" min="0" max="99" name="awayScore" value="${match.awayScore ?? ''}" required aria-label="Away final score">
+            <button type="submit">Mark finished</button>
+            <div class="tip-note" id="result-note-${match.id}"></div>
+          </form>
+        </article>
+      `).join('');
+
+      document.querySelectorAll('[data-result-form]').forEach((form) => form.addEventListener('submit', saveResult));
+    }
+
+    async function saveResult(event) {
+      event.preventDefault();
+      const form = event.currentTarget;
+      const matchId = form.dataset.matchId;
+      const note = document.getElementById(`result-note-${matchId}`);
+      const body = Object.fromEntries(new FormData(form));
+      try {
+        await api(`/api/admin/matches/${matchId}/result`, { method: 'POST', headers: adminHeaders(), body });
+        setMessage(note, 'Result saved.', 'success');
+        await loadMatches(false);
+      } catch (error) {
+        setMessage(note, error.message, 'error');
+      }
+    }
+
+    async function loadMatches(showLoading = true) {
+      if (showLoading) list.innerHTML = `<div class="empty">Loading matches...</div>`;
+      const data = await api('/api/matches');
+      matches = data.matches;
+      render();
+    }
+
+    filterInput.addEventListener('input', render);
+    await requireLogin();
+    await loadMatches();
+  </script>
+</body>
+</html>

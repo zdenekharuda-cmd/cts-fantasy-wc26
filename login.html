@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Login | CTS fantasy WC '26</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flag-icons/css/flag-icons.min.css">
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="logo">CTS fantasy WC '26</div>
+    <nav class="nav" data-nav></nav>
+  </header>
+  <main class="container">
+    <section class="card narrow">
+      <h1>Login</h1>
+      <p>Log in with your nickname and password.</p>
+      <form id="loginForm">
+        <label for="nickname">Nickname</label>
+        <input id="nickname" name="nickname" autocomplete="username" required>
+        <label for="password">Password</label>
+        <input id="password" name="password" type="password" autocomplete="current-password" required>
+        <div class="form-actions">
+          <button type="submit">Login</button>
+          <a href="/register.html">Create account</a>
+        </div>
+        <div id="message" class="message"></div>
+      </form>
+    </section>
+  </main>
+  <script type="module">
+    import { api, setMessage } from '/common.js';
+    const form = document.getElementById('loginForm');
+    const message = document.getElementById('message');
+    form.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      const body = Object.fromEntries(new FormData(form));
+      try {
+        await api('/api/login', { method: 'POST', body });
+        window.location.href = '/tips.html';
+      } catch (error) {
+        setMessage(message, error.message, 'error');
+      }
+    });
+  </script>
+</body>
+</html>
