@@ -1,5 +1,5 @@
 import 'dotenv/config';
-import { syncOpenFootball } from '../src/syncOpenFootball.js';
+import { syncOpenFootball } from './syncOpenFootball.js';
 
 try {
   const result = await syncOpenFootball();
