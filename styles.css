@@ -386,3 +386,46 @@ a:hover {
     min-width: 0;
   }
 }
+.bottom-mascot {
+  position: fixed;
+  right: 22px;
+  bottom: 22px;
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: white;
+  border: 1px solid #c8e6c9;
+  border-radius: 999px;
+  padding: 8px 14px 8px 8px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.14);
+  color: #1b5e20;
+  font-weight: 700;
+  font-size: 14px;
+}
+
+.bottom-mascot img {
+  width: 54px;
+  height: 54px;
+  object-fit: cover;
+  border-radius: 50%;
+  border: 3px solid #66bb6a;
+  background: white;
+}
+
+@media (max-width: 700px) {
+  .bottom-mascot {
+    right: 12px;
+    bottom: 12px;
+    padding: 6px;
+  }
+
+  .bottom-mascot span {
+    display: none;
+  }
+
+  .bottom-mascot img {
+    width: 46px;
+    height: 46px;
+  }
+}
