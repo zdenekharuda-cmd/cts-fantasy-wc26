@@ -27,8 +27,9 @@ export function parseKickoffToUtcIso(dateText, timeText) {
   const minute = Number(timeMatch[2]);
   const offsetMinutes = parseUtcOffset(timeMatch[3]);
 
-  // Source times are local-to-offset. UTC = local time - offset.
-  const utcMillis = Date.UTC(year, monthIndex, day, hour, minute) - offsetMinutes * 60_000;
+// Source times are local-to-offset.
+// UTC = local time - offset.
+const utcMillis = Date.UTC(year, monthIndex, day, hour, minute) - offsetMinutes * 60_000;
   return new Date(utcMillis).toISOString();
 }
 
