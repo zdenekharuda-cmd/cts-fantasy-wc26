@@ -68,7 +68,7 @@
 
       const lockedSections = new Set(
         [...sections.entries()]
-          .filter(([, sectionMatches]) => sectionMatches.some((m) => m.finished || m.locked))
+          .filter(([, sectionMatches]) => sectionMatches.some((m) => m.tip?.isCaptain && (m.finished || m.locked)))
           .map(([name]) => name)
       );
 
@@ -189,7 +189,7 @@
     await loadMatches();
   </script>
 <div class="bottom-mascot">
-  <img src="/images/zdenek-head.png" alt="Zdenek" />
+  <img src="/images/zdenek.png" alt="Zdenek" />
   <span>Good luck!</span>
 </div>
 </body>

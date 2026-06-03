@@ -23,8 +23,8 @@ export async function renderNav() {
   if (!nav) return;
   const { user } = await api('/api/me');
   nav.innerHTML = user
-    ? `<a href="/tips.html">Tip</a><a href="/scoreboard.html">Scoreboard</a><span>${escapeHtml(user.nickname)}</span><button id="logoutBtn">Logout</button>`
-    : `<a href="/login.html">Login</a><a href="/register.html">Registration</a><a href="/scoreboard.html">Scoreboard</a>`;
+    ? `<a href="/tips.html">Tip</a><a href="/scoreboard.html">Scoreboard</a><a href="/bodovani.html">Bodování</a><span>${escapeHtml(user.nickname)}</span><button id="logoutBtn">Logout</button>`
+    : `<a href="/login.html">Login</a><a href="/register.html">Registration</a><a href="/scoreboard.html">Scoreboard</a><a href="/bodovani.html">Bodování</a>`;
 
   const logoutBtn = document.getElementById('logoutBtn');
   if (logoutBtn) {

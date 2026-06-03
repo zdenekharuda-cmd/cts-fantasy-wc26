@@ -125,6 +125,9 @@ app.post('/api/register', async (req, res) => {
   if (!name || !nickname || !email || !password) {
     return res.status(400).json({ error: 'Name, nickname, email, and password are required.' });
   }
+  if (!email.endsWith('@cts-tradeit.cz')) {
+    return res.status(403).json({ error: 'Registrace pouze pro zvané.' });
+  }
   if (password.length < 8) {
     return res.status(400).json({ error: 'Password must be at least 8 characters.' });
   }
@@ -204,12 +207,14 @@ app.post('/api/tips/:matchId/captain', requireAuth, async (req, res) => {
   const tip = await getTipByUserAndMatch(req.session.userId, matchId);
   if (!tip) return res.status(400).json({ error: 'Save your tip first before setting captain.' });
 
-  const allMatches = await getAllMatches();
+  const [allMatches, userTips] = await Promise.all([getAllMatches(), getTipsByUser(req.session.userId)]);
   const section = matchSectionKey(match.round);
   const sectionMatches = allMatches.filter((m) => matchSectionKey(m.round) === section);
 
-  if (sectionMatches.some((m) => matchIsTipLocked(m) || isMatchFinished(m))) {
-    return res.status(423).json({ error: 'Captain is locked — a match in this round has already started or been played.' });
+  const captainTip = userTips.find((t) => t.isCaptain && sectionMatches.some((m) => m.id === Number(t.matchId)));
+  const captainMatch = captainTip ? sectionMatches.find((m) => m.id === Number(captainTip.matchId)) : null;
+  if (captainMatch && (matchIsTipLocked(captainMatch) || isMatchFinished(captainMatch))) {
+    return res.status(423).json({ error: 'Captain is locked — your captain\'s match has already started or been played.' });
   }
 
   await setCaptain(req.session.userId, matchId, sectionMatches.map((m) => m.id));
@@ -223,12 +228,14 @@ app.delete('/api/tips/:matchId/captain', requireAuth, async (req, res) => {
   const match = await getMatchById(matchId);
   if (!match) return res.status(404).json({ error: 'Match not found.' });
 
-  const allMatches = await getAllMatches();
+  const [allMatches, userTips] = await Promise.all([getAllMatches(), getTipsByUser(req.session.userId)]);
   const section = matchSectionKey(match.round);
   const sectionMatches = allMatches.filter((m) => matchSectionKey(m.round) === section);
 
-  if (sectionMatches.some((m) => matchIsTipLocked(m) || isMatchFinished(m))) {
-    return res.status(423).json({ error: 'Captain is locked — a match in this round has already started or been played.' });
+  const captainTip = userTips.find((t) => t.isCaptain && sectionMatches.some((m) => m.id === Number(t.matchId)));
+  const captainMatch = captainTip ? sectionMatches.find((m) => m.id === Number(captainTip.matchId)) : null;
+  if (captainMatch && (matchIsTipLocked(captainMatch) || isMatchFinished(captainMatch))) {
+    return res.status(423).json({ error: 'Captain is locked — your captain\'s match has already started or been played.' });
   }
 
   await removeCaptain(req.session.userId, matchId);
