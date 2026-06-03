@@ -1,4 +1,4 @@
-import { readJson, writeJson } from './store.js';
+import { getAllMatches, upsertMatch } from './store.js';
 import { flagCodeFor } from './teamFlags.js';
 
 export const DEFAULT_OPENFOOTBALL_URL =
@@ -27,9 +27,8 @@ export function parseKickoffToUtcIso(dateText, timeText) {
   const minute = Number(timeMatch[2]);
   const offsetMinutes = parseUtcOffset(timeMatch[3]);
 
-// Source times are local-to-offset.
-// UTC = local time - offset.
-const utcMillis = Date.UTC(year, monthIndex, day, hour, minute) - offsetMinutes * 60_000;
+  // Source times are local-to-offset. UTC = local time - offset.
+  const utcMillis = Date.UTC(year, monthIndex, day, hour, minute) - offsetMinutes * 60_000;
   return new Date(utcMillis).toISOString();
 }
 
@@ -74,17 +73,19 @@ export async function syncOpenFootball(url = DEFAULT_OPENFOOTBALL_URL) {
     throw new Error('Fixture source did not return a matches array.');
   }
 
-  const existingMatches = await readJson('matches.json', []);
+  const existingMatches = await getAllMatches();
   const existingById = new Map(existingMatches.map((match) => [Number(match.id), match]));
   const normalized = data.matches.map((match, index) => normalizeMatch(match, index, existingById));
 
-  normalized.sort((a, b) => new Date(a.kickoffUtc) - new Date(b.kickoffUtc));
-  await writeJson('matches.json', normalized);
+  for (const match of normalized) {
+    await upsertMatch(match);
+  }
 
+  const finished = normalized.filter((match) => match.status === 'FINISHED').length;
   return {
     tournament: data.name || 'World Cup 2026',
     count: normalized.length,
-    finished: normalized.filter((match) => match.status === 'FINISHED').length,
+    finished,
     source: url
   };
 }
