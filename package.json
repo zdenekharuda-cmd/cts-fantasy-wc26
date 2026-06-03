@@ -6,8 +6,8 @@
   "type": "module",
   "scripts": {
     "start": "node server.js",
-    "dev": "node --watch server.js",
-    "sync:matches": "node sync-matches.js"
+    "dev": "node --env-file=.env --watch server.js",
+    "sync:matches": "node --env-file=.env sync-matches.js"
   },
   "dependencies": {
     "bcryptjs": "^3.0.2",

@@ -45,9 +45,12 @@ export async function initDb() {
       match_id    INTEGER NOT NULL REFERENCES matches(id),
       home_score  INTEGER NOT NULL,
       away_score  INTEGER NOT NULL,
+      is_captain  BOOLEAN NOT NULL DEFAULT FALSE,
       submitted_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
       updated_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
       UNIQUE (user_id, match_id)
     );
+
+    ALTER TABLE tips ADD COLUMN IF NOT EXISTS is_captain BOOLEAN NOT NULL DEFAULT FALSE;
   `);
 }

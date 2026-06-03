@@ -87,17 +87,19 @@
             ${escapeHtml(match.venue)}<br>
             Current status: <b>${escapeHtml(match.status)}</b>
           </div>
-          <form class="tip-form" data-result-form data-match-id="${match.id}">
+          <form class="result-form" data-result-form data-match-id="${match.id}">
             <input type="number" min="0" max="99" name="homeScore" value="${match.homeScore ?? ''}" required aria-label="Home final score">
             <span class="dash">:</span>
             <input type="number" min="0" max="99" name="awayScore" value="${match.awayScore ?? ''}" required aria-label="Away final score">
             <button type="submit">Mark finished</button>
+            ${match.status === 'FINISHED' ? `<button type="button" class="btn-unfinish" data-unfinish data-match-id="${match.id}">Unmark</button>` : ''}
             <div class="tip-note" id="result-note-${match.id}"></div>
           </form>
         </article>
       `).join('');
 
       document.querySelectorAll('[data-result-form]').forEach((form) => form.addEventListener('submit', saveResult));
+      document.querySelectorAll('[data-unfinish]').forEach((btn) => btn.addEventListener('click', unfinishMatch));
     }
 
     async function saveResult(event) {
@@ -109,6 +111,19 @@
       try {
         await api(`/api/admin/matches/${matchId}/result`, { method: 'POST', headers: adminHeaders(), body });
         setMessage(note, 'Result saved.', 'success');
+        await loadMatches(false);
+      } catch (error) {
+        setMessage(note, error.message, 'error');
+      }
+    }
+
+    async function unfinishMatch(event) {
+      const btn = event.currentTarget;
+      const matchId = btn.dataset.matchId;
+      const note = document.getElementById(`result-note-${matchId}`);
+      try {
+        await api(`/api/admin/matches/${matchId}/result`, { method: 'DELETE', headers: adminHeaders() });
+        setMessage(note, 'Result cleared.', 'success');
         await loadMatches(false);
       } catch (error) {
         setMessage(note, error.message, 'error');

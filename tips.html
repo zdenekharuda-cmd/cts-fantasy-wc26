@@ -33,37 +33,90 @@
     const filterInput = document.getElementById('filterInput');
     let matches = [];
 
+    function matchSection(match) {
+      const num = parseInt(match.round.replace('Matchday ', ''), 10);
+      if (!isNaN(num)) {
+        if (num <= 7) return '1. kolo skupinové fáze';
+        if (num <= 14) return '2. kolo skupinové fáze';
+        return '3. kolo skupinové fáze';
+      }
+      return 'Vyřazovací fáze';
+    }
+
+    const SECTION_ORDER = ['1. kolo skupinové fáze', '2. kolo skupinové fáze', '3. kolo skupinové fáze', 'Vyřazovací fáze'];
+
     function render() {
       const filter = filterInput.value.trim().toLowerCase();
-      const visible = matches.filter((match) => {
-        const text = `${match.teamHome} ${match.teamAway} ${match.venue} ${match.round} ${match.group || ''}`.toLowerCase();
-        return !filter || text.includes(filter);
-      });
+      const visible = matches
+        .filter((match) => {
+          const text = `${match.teamHome} ${match.teamAway} ${match.venue} ${match.round} ${match.group || ''}`.toLowerCase();
+          return !filter || text.includes(filter);
+        })
+        .sort((a, b) => new Date(a.kickoffUtc) - new Date(b.kickoffUtc));
 
       if (!visible.length) {
         list.innerHTML = `<div class="empty">No matches found. If this is a fresh installation, run <b>npm run sync:matches</b> first.</div>`;
         return;
       }
 
-      list.innerHTML = visible.map((match) => matchCard(match)).join('');
+      const sections = new Map();
+      for (const match of visible) {
+        const section = matchSection(match);
+        if (!sections.has(section)) sections.set(section, []);
+        sections.get(section).push(match);
+      }
+
+      const lockedSections = new Set(
+        [...sections.entries()]
+          .filter(([, sectionMatches]) => sectionMatches.some((m) => m.finished || m.locked))
+          .map(([name]) => name)
+      );
+
+      const orderedSections = SECTION_ORDER.filter((s) => sections.has(s));
+      list.innerHTML = orderedSections.map((section) => `
+        <section class="round-section">
+          <h2 class="round-heading">${escapeHtml(section)}${lockedSections.has(section) ? ' <span class="round-locked">🔒 kapitán uzamčen</span>' : ''}</h2>
+          ${sections.get(section).map((match) => matchCard(match, lockedSections.has(matchSection(match)))).join('')}
+        </section>
+      `).join('');
+
       document.querySelectorAll('[data-tip-form]').forEach((form) => {
         form.addEventListener('submit', submitTip);
       });
+      document.querySelectorAll('[data-captain-btn]').forEach((btn) => {
+        btn.addEventListener('click', toggleCaptain);
+      });
     }
 
-    function matchCard(match) {
+    function matchCard(match, sectionLocked = false) {
       const statusClass = match.finished ? 'finished' : match.locked ? 'locked' : '';
       const statusLabel = match.finished ? `Finished ${match.homeScore}:${match.awayScore}` : match.locked ? 'Locked' : 'Open';
       const tip = match.tip || {};
       const disabled = match.locked || match.finished ? 'disabled' : '';
+      const isCaptain = tip.isCaptain ?? false;
+      const hasTip = match.tip !== null;
       const points = match.tip?.points ?? null;
       const tipNote = match.finished && match.tip
-        ? `Your tip: ${tip.homeScore}:${tip.awayScore} · ${points} point${points === 1 ? '' : 's'}`
+        ? `Your tip: ${tip.homeScore}:${tip.awayScore}${isCaptain ? ' 👑' : ''} · ${points} point${points === 1 ? '' : 's'}${isCaptain ? ' (2×)' : ''}`
         : match.tip
-          ? `Saved tip: ${tip.homeScore}:${tip.awayScore}`
+          ? `Saved tip: ${tip.homeScore}:${tip.awayScore}${isCaptain ? ' 👑' : ''}`
           : match.locked
             ? 'No changes allowed now.'
             : 'No tip saved yet.';
+
+      const captainDisabled = !hasTip || match.locked || sectionLocked;
+      const captainSlot = match.finished
+        ? '<span></span>'
+        : `<button type="button"
+            class="captain-btn ${isCaptain ? 'active' : ''}"
+            data-captain-btn
+            data-match-id="${match.id}"
+            data-is-captain="${isCaptain}"
+            ${captainDisabled ? 'disabled' : ''}
+            title="${sectionLocked ? 'Kolo uzamčeno — kapitán nelze změnit' : isCaptain ? 'Odebrat kapitána' : 'Označit jako kapitán (2× body)'}"
+          >👑</button>`;
+
+      const saveBtn = match.finished ? '' : `<button type="submit" ${match.locked ? 'disabled' : ''}>Save tip</button>`;
 
       return `
         <article class="match-card ${match.locked ? 'locked' : ''}">
@@ -80,10 +133,11 @@
             ${escapeHtml(match.venue)}
           </div>
           <form class="tip-form" data-tip-form data-match-id="${match.id}">
+            ${captainSlot}
             <input type="number" min="0" max="99" name="homeScore" value="${tip.homeScore ?? ''}" ${disabled} required aria-label="Home score">
             <span class="dash">:</span>
             <input type="number" min="0" max="99" name="awayScore" value="${tip.awayScore ?? ''}" ${disabled} required aria-label="Away score">
-            <button type="submit" ${disabled}>Save tip</button>
+            ${saveBtn}
             <div class="tip-note" id="tip-note-${match.id}">${escapeHtml(tipNote)}</div>
           </form>
         </article>`;
@@ -102,6 +156,23 @@
         await loadMatches(false);
       } catch (error) {
         setMessage(note, error.message, 'error');
+      }
+    }
+
+    async function toggleCaptain(event) {
+      const btn = event.currentTarget;
+      const matchId = btn.dataset.matchId;
+      const isCaptain = btn.dataset.isCaptain === 'true';
+      const note = document.getElementById(`tip-note-${matchId}`);
+      try {
+        if (isCaptain) {
+          await api(`/api/tips/${matchId}/captain`, { method: 'DELETE' });
+        } else {
+          await api(`/api/tips/${matchId}/captain`, { method: 'POST' });
+        }
+        await loadMatches(false);
+      } catch (error) {
+        if (note) setMessage(note, error.message, 'error');
       }
     }
 

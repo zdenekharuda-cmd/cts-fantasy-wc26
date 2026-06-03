@@ -93,6 +93,15 @@ export async function upsertMatch(match) {
   );
 }
 
+export async function resetMatchResult(id) {
+  const { rows } = await pool.query(
+    `UPDATE matches SET home_score = NULL, away_score = NULL, status = 'SCHEDULED', result_updated_at = NOW()
+     WHERE id = $1 RETURNING id`,
+    [id]
+  );
+  return rows[0] ?? null;
+}
+
 export async function setMatchResult(id, homeScore, awayScore) {
   const { rows } = await pool.query(
     `UPDATE matches SET home_score = $2, away_score = $3, status = 'FINISHED', result_updated_at = NOW()
@@ -111,6 +120,7 @@ export async function getTipsByUser(userId) {
   const { rows } = await pool.query(
     `SELECT id, user_id AS "userId", match_id AS "matchId",
             home_score AS "homeScore", away_score AS "awayScore",
+            is_captain AS "isCaptain",
             submitted_at AS "submittedAt", updated_at AS "updatedAt"
      FROM tips WHERE user_id = $1`,
     [userId]
@@ -122,6 +132,7 @@ export async function getAllTips() {
   const { rows } = await pool.query(
     `SELECT id, user_id AS "userId", match_id AS "matchId",
             home_score AS "homeScore", away_score AS "awayScore",
+            is_captain AS "isCaptain",
             submitted_at AS "submittedAt", updated_at AS "updatedAt"
      FROM tips`
   );
@@ -138,4 +149,32 @@ export async function upsertTip({ userId, matchId, homeScore, awayScore }) {
        updated_at = NOW()`,
     [userId, matchId, homeScore, awayScore]
   );
+}
+
+export async function setCaptain(userId, matchId, sectionMatchIds) {
+  await pool.query(
+    `UPDATE tips SET is_captain = FALSE
+     WHERE user_id = $1 AND match_id = ANY($2::int[])`,
+    [userId, sectionMatchIds]
+  );
+  await pool.query(
+    `UPDATE tips SET is_captain = TRUE
+     WHERE user_id = $1 AND match_id = $2`,
+    [userId, matchId]
+  );
+}
+
+export async function removeCaptain(userId, matchId) {
+  await pool.query(
+    `UPDATE tips SET is_captain = FALSE WHERE user_id = $1 AND match_id = $2`,
+    [userId, matchId]
+  );
+}
+
+export async function getTipByUserAndMatch(userId, matchId) {
+  const { rows } = await pool.query(
+    `SELECT id FROM tips WHERE user_id = $1 AND match_id = $2`,
+    [userId, matchId]
+  );
+  return rows[0] ?? null;
 }

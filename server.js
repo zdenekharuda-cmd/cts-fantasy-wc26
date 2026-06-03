@@ -8,8 +8,8 @@ import helmet from 'helmet';
 import { initDb } from './db.js';
 import {
   getAllUsers, getUserById, getUserByNickname, getUserByEmail, createUser,
-  getAllMatches, getMatchById, setMatchResult,
-  getTipsByUser, getAllTips, upsertTip
+  getAllMatches, getMatchById, setMatchResult, resetMatchResult,
+  getTipsByUser, getAllTips, upsertTip, setCaptain, removeCaptain, getTipByUserAndMatch
 } from './store.js';
 import { calculateTipPoints, isMatchFinished } from './scoring.js';
 import { syncOpenFootball } from './syncOpenFootball.js';
@@ -70,6 +70,16 @@ function normalizeScore(value) {
   return number;
 }
 
+function matchSectionKey(round) {
+  const num = parseInt((round || '').replace('Matchday ', ''), 10);
+  if (!isNaN(num)) {
+    if (num <= 7) return '1';
+    if (num <= 14) return '2';
+    return '3';
+  }
+  return 'knockout';
+}
+
 function matchIsTipLocked(match, now = Date.now()) {
   const kickoff = new Date(match.kickoffUtc).getTime();
   return Number.isFinite(kickoff) && kickoff - now <= FIVE_MINUTES_MS;
@@ -78,6 +88,7 @@ function matchIsTipLocked(match, now = Date.now()) {
 function enrichMatchForUser(match, tip = null) {
   const locked = matchIsTipLocked(match);
   const finished = isMatchFinished(match);
+  const basePoints = finished && tip ? calculateTipPoints(tip, match) : null;
   return {
     ...match,
     locked,
@@ -86,9 +97,10 @@ function enrichMatchForUser(match, tip = null) {
       ? {
           homeScore: tip.homeScore,
           awayScore: tip.awayScore,
+          isCaptain: tip.isCaptain ?? false,
           submittedAt: tip.submittedAt,
           updatedAt: tip.updatedAt,
-          points: finished ? calculateTipPoints(tip, match) : null
+          points: basePoints !== null ? (tip.isCaptain ? basePoints * 2 : basePoints) : null
         }
       : null
   };
@@ -181,6 +193,48 @@ app.post('/api/tips/:matchId', requireAuth, async (req, res) => {
   res.json({ ok: true });
 });
 
+app.post('/api/tips/:matchId/captain', requireAuth, async (req, res) => {
+  const matchId = Number(req.params.matchId);
+  if (!Number.isInteger(matchId)) return res.status(400).json({ error: 'Invalid match id.' });
+
+  const match = await getMatchById(matchId);
+  if (!match) return res.status(404).json({ error: 'Match not found.' });
+  if (matchIsTipLocked(match)) return res.status(423).json({ error: 'Tips are locked 5 minutes before kick-off.' });
+
+  const tip = await getTipByUserAndMatch(req.session.userId, matchId);
+  if (!tip) return res.status(400).json({ error: 'Save your tip first before setting captain.' });
+
+  const allMatches = await getAllMatches();
+  const section = matchSectionKey(match.round);
+  const sectionMatches = allMatches.filter((m) => matchSectionKey(m.round) === section);
+
+  if (sectionMatches.some((m) => matchIsTipLocked(m) || isMatchFinished(m))) {
+    return res.status(423).json({ error: 'Captain is locked — a match in this round has already started or been played.' });
+  }
+
+  await setCaptain(req.session.userId, matchId, sectionMatches.map((m) => m.id));
+  res.json({ ok: true });
+});
+
+app.delete('/api/tips/:matchId/captain', requireAuth, async (req, res) => {
+  const matchId = Number(req.params.matchId);
+  if (!Number.isInteger(matchId)) return res.status(400).json({ error: 'Invalid match id.' });
+
+  const match = await getMatchById(matchId);
+  if (!match) return res.status(404).json({ error: 'Match not found.' });
+
+  const allMatches = await getAllMatches();
+  const section = matchSectionKey(match.round);
+  const sectionMatches = allMatches.filter((m) => matchSectionKey(m.round) === section);
+
+  if (sectionMatches.some((m) => matchIsTipLocked(m) || isMatchFinished(m))) {
+    return res.status(423).json({ error: 'Captain is locked — a match in this round has already started or been played.' });
+  }
+
+  await removeCaptain(req.session.userId, matchId);
+  res.json({ ok: true });
+});
+
 app.get('/api/scoreboard', async (req, res) => {
   const [users, matches, tips] = await Promise.all([
     getAllUsers(),
@@ -200,10 +254,11 @@ app.get('/api/scoreboard', async (req, res) => {
     for (const tip of userTips) {
       const match = matchById.get(Number(tip.matchId));
       if (!match || !isMatchFinished(match)) continue;
-      const points = calculateTipPoints(tip, match) ?? 0;
+      const base = calculateTipPoints(tip, match) ?? 0;
+      const points = tip.isCaptain ? base * 2 : base;
       totalPoints += points;
       scoredTips += 1;
-      if (points === 3) exactScores += 1;
+      if (base === 3) exactScores += 1;
     }
 
     return { userId: user.id, name: user.name, nickname: user.nickname, totalPoints, exactScores, scoredTips };
@@ -225,6 +280,15 @@ app.post('/api/admin/sync', requireAdmin, async (req, res) => {
   } catch (error) {
     res.status(502).json({ error: error.message });
   }
+});
+
+app.delete('/api/admin/matches/:matchId/result', requireAdmin, async (req, res) => {
+  const matchId = Number(req.params.matchId);
+  if (!Number.isInteger(matchId)) return res.status(400).json({ error: 'Invalid match id.' });
+
+  const match = await resetMatchResult(matchId);
+  if (!match) return res.status(404).json({ error: 'Match not found.' });
+  res.json({ ok: true });
 });
 
 app.post('/api/admin/matches/:matchId/result', requireAdmin, async (req, res) => {
