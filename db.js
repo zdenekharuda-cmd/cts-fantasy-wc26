@@ -52,5 +52,7 @@ export async function initDb() {
     );
 
     ALTER TABLE tips ADD COLUMN IF NOT EXISTS is_captain BOOLEAN NOT NULL DEFAULT FALSE;
+    ALTER TABLE tips ADD COLUMN IF NOT EXISTS bonus_player TEXT;
+    ALTER TABLE matches ADD COLUMN IF NOT EXISTS czech_scorers TEXT[] NOT NULL DEFAULT '{}';
   `);
 }

@@ -35,6 +35,13 @@
   <script type="module">
     import { api, escapeHtml, flagSpan, formatKickoff, requireLogin, setMessage } from '/common.js';
 
+    const CZECH_PLAYERS_FLAT = [
+      'Lukáš Horníček','Matěj Kovář','Jindřich Staněk',
+      'Vladimír Coufal','David Doudera','Tomáš Holeš','Robin Hranáč','Štěpán Chaloupek','David Jurásek','Ladislav Krejčí','Jaroslav Zelený','David Zima',
+      'Lukáš Červ','Vladimír Darida','Lukáš Provod','Michal Sadílek','Hugo Sochůrek','Alexandr Sojka','Tomáš Souček','Pavel Šulc','Denis Višinský',
+      'Adam Hložek','Tomáš Chorý','Mojmír Chytil','Jan Kuchta','Patrik Schick',
+    ];
+
     const tokenInput = document.getElementById('adminToken');
     const saveTokenBtn = document.getElementById('saveTokenBtn');
     const syncBtn = document.getElementById('syncBtn');
@@ -95,11 +102,32 @@
             ${match.status === 'FINISHED' ? `<button type="button" class="btn-unfinish" data-unfinish data-match-id="${match.id}">Unmark</button>` : ''}
             <div class="tip-note" id="result-note-${match.id}"></div>
           </form>
+          ${(match.teamHome === 'Czech Republic' || match.teamAway === 'Czech Republic') ? `
+          <div class="scorers-panel" data-match-id="${match.id}">
+            <div class="scorers-label">🇨🇿 Střelci Česka</div>
+            <ul class="scorers-list" id="scorers-list-${match.id}">
+              ${(match.czechScorers || []).map(s => `
+                <li>
+                  ${escapeHtml(s)}
+                  <button type="button" class="scorer-remove" data-remove-scorer data-match-id="${match.id}" data-player="${escapeHtml(s)}">×</button>
+                </li>`).join('') || '<li class="muted">Žádní střelci</li>'}
+            </ul>
+            <div class="scorers-add">
+              <select class="scorer-select" id="scorer-select-${match.id}">
+                <option value="">— vyber hráče —</option>
+                ${CZECH_PLAYERS_FLAT.map(p => `<option value="${p}">${escapeHtml(p)}</option>`).join('')}
+              </select>
+              <button type="button" class="scorer-add-btn" data-add-scorer data-match-id="${match.id}">Přidat</button>
+            </div>
+            <div class="tip-note" id="scorers-note-${match.id}"></div>
+          </div>` : ''}
         </article>
       `).join('');
 
       document.querySelectorAll('[data-result-form]').forEach((form) => form.addEventListener('submit', saveResult));
       document.querySelectorAll('[data-unfinish]').forEach((btn) => btn.addEventListener('click', unfinishMatch));
+      document.querySelectorAll('[data-add-scorer]').forEach((btn) => btn.addEventListener('click', addScorer));
+      document.querySelectorAll('[data-remove-scorer]').forEach((btn) => btn.addEventListener('click', removeScorer));
     }
 
     async function saveResult(event) {
@@ -115,6 +143,38 @@
       } catch (error) {
         setMessage(note, error.message, 'error');
       }
+    }
+
+    function getScorersForMatch(matchId) {
+      const match = matches.find((m) => m.id === Number(matchId));
+      return match?.czechScorers ?? [];
+    }
+
+    async function saveScorers(matchId, scorers) {
+      const note = document.getElementById(`scorers-note-${matchId}`);
+      try {
+        await api(`/api/admin/matches/${matchId}/scorers`, { method: 'POST', headers: adminHeaders(), body: { scorers } });
+        setMessage(note, 'Uloženo.', 'success');
+        await loadMatches(false);
+      } catch (error) {
+        setMessage(note, error.message, 'error');
+      }
+    }
+
+    async function addScorer(event) {
+      const matchId = event.currentTarget.dataset.matchId;
+      const select = document.getElementById(`scorer-select-${matchId}`);
+      const player = select.value;
+      if (!player) return;
+      const current = getScorersForMatch(matchId);
+      if (current.includes(player)) return;
+      await saveScorers(matchId, [...current, player]);
+    }
+
+    async function removeScorer(event) {
+      const { matchId, player } = event.currentTarget.dataset;
+      const current = getScorersForMatch(matchId);
+      await saveScorers(matchId, current.filter((s) => s !== player));
     }
 
     async function unfinishMatch(event) {

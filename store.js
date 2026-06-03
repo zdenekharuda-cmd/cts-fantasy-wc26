@@ -43,29 +43,29 @@ export async function createUser({ name, nickname, email, passwordHash }) {
 
 // --- Matches ---
 
+const MATCH_COLUMNS = `
+  id, source_num AS "sourceNum", round, "group", date, source_time AS "sourceTime",
+  kickoff_utc AS "kickoffUtc", team_home AS "teamHome", team_away AS "teamAway",
+  home_flag AS "homeFlag", away_flag AS "awayFlag", venue,
+  home_score AS "homeScore", away_score AS "awayScore", status,
+  result_updated_at AS "resultUpdatedAt", imported_at AS "importedAt", source,
+  czech_scorers AS "czechScorers"`;
+
 export async function getAllMatches() {
-  const { rows } = await pool.query(
-    `SELECT id, source_num AS "sourceNum", round, "group", date, source_time AS "sourceTime",
-            kickoff_utc AS "kickoffUtc", team_home AS "teamHome", team_away AS "teamAway",
-            home_flag AS "homeFlag", away_flag AS "awayFlag", venue,
-            home_score AS "homeScore", away_score AS "awayScore", status,
-            result_updated_at AS "resultUpdatedAt", imported_at AS "importedAt", source
-     FROM matches ORDER BY kickoff_utc`
-  );
+  const { rows } = await pool.query(`SELECT ${MATCH_COLUMNS} FROM matches ORDER BY kickoff_utc`);
   return rows;
 }
 
 export async function getMatchById(id) {
-  const { rows } = await pool.query(
-    `SELECT id, source_num AS "sourceNum", round, "group", date, source_time AS "sourceTime",
-            kickoff_utc AS "kickoffUtc", team_home AS "teamHome", team_away AS "teamAway",
-            home_flag AS "homeFlag", away_flag AS "awayFlag", venue,
-            home_score AS "homeScore", away_score AS "awayScore", status,
-            result_updated_at AS "resultUpdatedAt", imported_at AS "importedAt", source
-     FROM matches WHERE id = $1`,
-    [id]
-  );
+  const { rows } = await pool.query(`SELECT ${MATCH_COLUMNS} FROM matches WHERE id = $1`, [id]);
   return rows[0] ?? null;
+}
+
+export async function setCzechScorers(matchId, scorers) {
+  await pool.query(
+    `UPDATE matches SET czech_scorers = $2 WHERE id = $1`,
+    [matchId, scorers]
+  );
 }
 
 export async function upsertMatch(match) {
@@ -120,7 +120,7 @@ export async function getTipsByUser(userId) {
   const { rows } = await pool.query(
     `SELECT id, user_id AS "userId", match_id AS "matchId",
             home_score AS "homeScore", away_score AS "awayScore",
-            is_captain AS "isCaptain",
+            is_captain AS "isCaptain", bonus_player AS "bonusPlayer",
             submitted_at AS "submittedAt", updated_at AS "updatedAt"
      FROM tips WHERE user_id = $1`,
     [userId]
@@ -132,11 +132,18 @@ export async function getAllTips() {
   const { rows } = await pool.query(
     `SELECT id, user_id AS "userId", match_id AS "matchId",
             home_score AS "homeScore", away_score AS "awayScore",
-            is_captain AS "isCaptain",
+            is_captain AS "isCaptain", bonus_player AS "bonusPlayer",
             submitted_at AS "submittedAt", updated_at AS "updatedAt"
      FROM tips`
   );
   return rows;
+}
+
+export async function saveBonusTip(userId, matchId, bonusPlayer) {
+  await pool.query(
+    `UPDATE tips SET bonus_player = $3 WHERE user_id = $1 AND match_id = $2`,
+    [userId, matchId, bonusPlayer || null]
+  );
 }
 
 export async function upsertTip({ userId, matchId, homeScore, awayScore }) {

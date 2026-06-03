@@ -9,7 +9,7 @@ import { initDb } from './db.js';
 import {
   getAllUsers, getUserById, getUserByNickname, getUserByEmail, createUser,
   getAllMatches, getMatchById, setMatchResult, resetMatchResult,
-  getTipsByUser, getAllTips, upsertTip, setCaptain, removeCaptain, getTipByUserAndMatch
+  getTipsByUser, getAllTips, upsertTip, setCaptain, removeCaptain, getTipByUserAndMatch, saveBonusTip, setCzechScorers
 } from './store.js';
 import { calculateTipPoints, isMatchFinished } from './scoring.js';
 import { syncOpenFootball } from './syncOpenFootball.js';
@@ -89,6 +89,7 @@ function enrichMatchForUser(match, tip = null) {
   const locked = matchIsTipLocked(match);
   const finished = isMatchFinished(match);
   const basePoints = finished && tip ? calculateTipPoints(tip, match) : null;
+  const bonusHit = finished && tip?.bonusPlayer && Array.isArray(match.czechScorers) && match.czechScorers.includes(tip.bonusPlayer);
   return {
     ...match,
     locked,
@@ -98,6 +99,8 @@ function enrichMatchForUser(match, tip = null) {
           homeScore: tip.homeScore,
           awayScore: tip.awayScore,
           isCaptain: tip.isCaptain ?? false,
+          bonusPlayer: tip.bonusPlayer ?? null,
+          bonusHit: bonusHit ?? false,
           submittedAt: tip.submittedAt,
           updatedAt: tip.updatedAt,
           points: basePoints !== null ? (tip.isCaptain ? basePoints * 2 : basePoints) : null
@@ -266,6 +269,9 @@ app.get('/api/scoreboard', async (req, res) => {
       totalPoints += points;
       scoredTips += 1;
       if (base === 3) exactScores += 1;
+      if (tip.bonusPlayer && Array.isArray(match.czechScorers) && match.czechScorers.includes(tip.bonusPlayer)) {
+        totalPoints += 2;
+      }
     }
 
     return { userId: user.id, name: user.name, nickname: user.nickname, totalPoints, exactScores, scoredTips };
@@ -278,6 +284,34 @@ app.get('/api/scoreboard', async (req, res) => {
   });
 
   res.json({ finishedMatches: finishedMatches.length, users: rows });
+});
+
+app.post('/api/tips/:matchId/bonus', requireAuth, async (req, res) => {
+  const matchId = Number(req.params.matchId);
+  if (!Number.isInteger(matchId)) return res.status(400).json({ error: 'Invalid match id.' });
+
+  const match = await getMatchById(matchId);
+  if (!match) return res.status(404).json({ error: 'Match not found.' });
+  if (matchIsTipLocked(match)) return res.status(423).json({ error: 'Tips are locked 5 minutes before kick-off.' });
+
+  const tip = await getTipByUserAndMatch(req.session.userId, matchId);
+  if (!tip) return res.status(400).json({ error: 'Save your tip first before setting a bonus pick.' });
+
+  const bonusPlayer = String(req.body.bonusPlayer || '').trim() || null;
+  await saveBonusTip(req.session.userId, matchId, bonusPlayer);
+  res.json({ ok: true });
+});
+
+app.post('/api/admin/matches/:matchId/scorers', requireAdmin, async (req, res) => {
+  const matchId = Number(req.params.matchId);
+  if (!Number.isInteger(matchId)) return res.status(400).json({ error: 'Invalid match id.' });
+
+  const scorers = Array.isArray(req.body.scorers)
+    ? req.body.scorers.map((s) => String(s).trim()).filter(Boolean)
+    : [];
+
+  await setCzechScorers(matchId, scorers);
+  res.json({ ok: true, scorers });
 });
 
 app.post('/api/admin/sync', requireAdmin, async (req, res) => {

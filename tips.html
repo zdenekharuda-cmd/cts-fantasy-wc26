@@ -33,6 +33,17 @@
     const filterInput = document.getElementById('filterInput');
     let matches = [];
 
+    const CZECH_PLAYERS = {
+      'Brankáři':  ['Lukáš Horníček', 'Matěj Kovář', 'Jindřich Staněk'],
+      'Obránci':   ['Vladimír Coufal', 'David Doudera', 'Tomáš Holeš', 'Robin Hranáč', 'Štěpán Chaloupek', 'David Jurásek', 'Ladislav Krejčí', 'Jaroslav Zelený', 'David Zima'],
+      'Záložníci': ['Lukáš Červ', 'Vladimír Darida', 'Lukáš Provod', 'Michal Sadílek', 'Hugo Sochůrek', 'Alexandr Sojka', 'Tomáš Souček', 'Pavel Šulc', 'Denis Višinský'],
+      'Útočníci':  ['Adam Hložek', 'Tomáš Chorý', 'Mojmír Chytil', 'Jan Kuchta', 'Patrik Schick'],
+    };
+
+    function isCzechMatch(match) {
+      return match.teamHome === 'Czech Republic' || match.teamAway === 'Czech Republic';
+    }
+
     function matchSection(match) {
       const num = parseInt(match.round.replace('Matchday ', ''), 10);
       if (!isNaN(num)) {
@@ -86,6 +97,9 @@
       document.querySelectorAll('[data-captain-btn]').forEach((btn) => {
         btn.addEventListener('click', toggleCaptain);
       });
+      document.querySelectorAll('[data-bonus-save]').forEach((btn) => {
+        btn.addEventListener('click', saveBonusTip);
+      });
     }
 
     function matchCard(match, sectionLocked = false) {
@@ -118,6 +132,35 @@
 
       const saveBtn = match.finished ? '' : `<button type="submit" ${match.locked ? 'disabled' : ''}>Save tip</button>`;
 
+      const bonusPanel = isCzechMatch(match) ? (() => {
+        const current = tip.bonusPlayer ?? '';
+        const canEdit = hasTip && !match.locked && !match.finished;
+        const playerOptions = Object.entries(CZECH_PLAYERS).map(([pos, players]) =>
+          `<optgroup label="${pos}">${players.map(p => `<option value="${p}" ${p === current ? 'selected' : ''}>${p}</option>`).join('')}</optgroup>`
+        ).join('');
+        const bonusResult = match.finished && current
+          ? (tip.bonusHit
+              ? `<span class="bonus-result hit">✓ +2 body</span>`
+              : `<span class="bonus-result miss">✗ nestřelil</span>`)
+          : '';
+        return `
+          <div class="bonus-tip">
+            <div class="bonus-header">
+              <span class="bonus-label">🎯 Bonusový tip — střelec</span>
+              ${current ? `<span class="bonus-current">${escapeHtml(current)}</span>` : ''}
+              ${bonusResult}
+            </div>
+            ${!match.finished ? `<div class="bonus-body">
+              <select class="bonus-select" data-bonus-select data-match-id="${match.id}" ${!canEdit ? 'disabled' : ''}>
+                <option value="">— vyber hráče —</option>
+                ${playerOptions}
+              </select>
+              ${canEdit ? `<button type="button" class="bonus-save-btn" data-bonus-save data-match-id="${match.id}">Uložit</button>` : ''}
+              <div class="tip-note" id="bonus-note-${match.id}"></div>
+            </div>` : ''}
+          </div>`;
+      })() : '';
+
       return `
         <article class="match-card ${match.locked ? 'locked' : ''}">
           <div>
@@ -140,6 +183,7 @@
             ${saveBtn}
             <div class="tip-note" id="tip-note-${match.id}">${escapeHtml(tipNote)}</div>
           </form>
+          ${bonusPanel}
         </article>`;
     }
 
@@ -153,6 +197,20 @@
       try {
         await api(`/api/tips/${matchId}`, { method: 'POST', body });
         setMessage(note, 'Saved.', 'success');
+        await loadMatches(false);
+      } catch (error) {
+        setMessage(note, error.message, 'error');
+      }
+    }
+
+    async function saveBonusTip(event) {
+      const btn = event.currentTarget;
+      const matchId = btn.dataset.matchId;
+      const select = document.querySelector(`[data-bonus-select][data-match-id="${matchId}"]`);
+      const note = document.getElementById(`bonus-note-${matchId}`);
+      try {
+        await api(`/api/tips/${matchId}/bonus`, { method: 'POST', body: { bonusPlayer: select.value } });
+        setMessage(note, select.value ? `Uloženo: ${select.value}` : 'Bonusový tip odebrán.', 'success');
         await loadMatches(false);
       } catch (error) {
         setMessage(note, error.message, 'error');
