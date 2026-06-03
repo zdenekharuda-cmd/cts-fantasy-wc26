@@ -108,17 +108,17 @@
       const tip = match.tip || {};
       const disabled = match.locked || match.finished ? 'disabled' : '';
       const isCaptain = tip.isCaptain ?? false;
-      const hasTip = match.tip !== null;
+      const hasScore = match.tip !== null && tip.homeScore !== null && tip.awayScore !== null;
       const points = match.tip?.points ?? null;
-      const tipNote = match.finished && match.tip
+      const tipNote = match.finished && hasScore
         ? `Tvůj tip: ${tip.homeScore}:${tip.awayScore}${isCaptain ? ' 👑' : ''} · ${points} ${points === 1 ? 'bod' : points >= 2 && points <= 4 ? 'body' : 'bodů'}${isCaptain ? ' (2×)' : ''}`
-        : match.tip
+        : hasScore
           ? `Uložený tip: ${tip.homeScore}:${tip.awayScore}${isCaptain ? ' 👑' : ''}`
           : match.locked
             ? 'Tip již nelze měnit.'
             : 'Tip zatím nezadán.';
 
-      const captainDisabled = !hasTip || match.locked || sectionLocked;
+      const captainDisabled = match.locked || sectionLocked;
       const captainSlot = match.finished
         ? '<span></span>'
         : `<button type="button"
@@ -134,7 +134,7 @@
 
       const bonusPanel = isCzechMatch(match) ? (() => {
         const current = tip.bonusPlayer ?? '';
-        const canEdit = hasTip && !match.locked && !match.finished;
+        const canEdit = !match.locked && !match.finished;
         const playerOptions = Object.entries(CZECH_PLAYERS).map(([pos, players]) =>
           `<optgroup label="${pos}">${players.map(p => `<option value="${p}" ${p === current ? 'selected' : ''}>${p}</option>`).join('')}</optgroup>`
         ).join('');

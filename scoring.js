@@ -5,6 +5,11 @@ function outcome(home, away) {
 }
 
 export function calculateTipPoints(tip, match) {
+  if (tip.homeScore === null || tip.homeScore === undefined ||
+      tip.awayScore === null || tip.awayScore === undefined) {
+    return null;
+  }
+
   const actualHome = Number(match.homeScore);
   const actualAway = Number(match.awayScore);
   const predictedHome = Number(tip.homeScore);

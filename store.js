@@ -36,7 +36,7 @@ export async function getUserByEmail(email) {
 export async function createUser({ name, nickname, email, passwordHash }) {
   const { rows } = await pool.query(
     'INSERT INTO users (name, nickname, email, password_hash) VALUES ($1, $2, $3, $4) RETURNING id, name, nickname, email, created_at AS "createdAt"',
-    [name, nickname, email.toLowerCase(), passwordHash]
+    [name, nickname, email ? email.toLowerCase() : null, passwordHash]
   );
   return rows[0];
 }
@@ -174,6 +174,13 @@ export async function setCaptain(userId, matchId, sectionMatchIds) {
 export async function removeCaptain(userId, matchId) {
   await pool.query(
     `UPDATE tips SET is_captain = FALSE WHERE user_id = $1 AND match_id = $2`,
+    [userId, matchId]
+  );
+}
+
+export async function ensureTipRow(userId, matchId) {
+  await pool.query(
+    `INSERT INTO tips (user_id, match_id) VALUES ($1, $2) ON CONFLICT (user_id, match_id) DO NOTHING`,
     [userId, matchId]
   );
 }

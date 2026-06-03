@@ -13,10 +13,12 @@ export async function initDb() {
       id          SERIAL PRIMARY KEY,
       name        TEXT NOT NULL,
       nickname    TEXT NOT NULL UNIQUE,
-      email       TEXT NOT NULL UNIQUE,
+      email       TEXT,
       password_hash TEXT NOT NULL,
       created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );
+
+    ALTER TABLE users ALTER COLUMN email DROP NOT NULL;
 
     CREATE TABLE IF NOT EXISTS matches (
       id              INTEGER PRIMARY KEY,
@@ -43,9 +45,10 @@ export async function initDb() {
       id          SERIAL PRIMARY KEY,
       user_id     INTEGER NOT NULL REFERENCES users(id),
       match_id    INTEGER NOT NULL REFERENCES matches(id),
-      home_score  INTEGER NOT NULL,
-      away_score  INTEGER NOT NULL,
+      home_score  INTEGER,
+      away_score  INTEGER,
       is_captain  BOOLEAN NOT NULL DEFAULT FALSE,
+      bonus_player TEXT,
       submitted_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
       updated_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
       UNIQUE (user_id, match_id)
@@ -53,6 +56,8 @@ export async function initDb() {
 
     ALTER TABLE tips ADD COLUMN IF NOT EXISTS is_captain BOOLEAN NOT NULL DEFAULT FALSE;
     ALTER TABLE tips ADD COLUMN IF NOT EXISTS bonus_player TEXT;
+    ALTER TABLE tips ALTER COLUMN home_score DROP NOT NULL;
+    ALTER TABLE tips ALTER COLUMN away_score DROP NOT NULL;
     ALTER TABLE matches ADD COLUMN IF NOT EXISTS czech_scorers TEXT[] NOT NULL DEFAULT '{}';
   `);
 }

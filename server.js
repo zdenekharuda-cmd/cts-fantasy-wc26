@@ -9,7 +9,7 @@ import { initDb } from './db.js';
 import {
   getAllUsers, getUserById, getUserByNickname, getUserByEmail, createUser,
   getAllMatches, getMatchById, setMatchResult, resetMatchResult,
-  getTipsByUser, getAllTips, upsertTip, setCaptain, removeCaptain, getTipByUserAndMatch, saveBonusTip, setCzechScorers
+  getTipsByUser, getAllTips, upsertTip, setCaptain, removeCaptain, getTipByUserAndMatch, saveBonusTip, setCzechScorers, ensureTipRow
 } from './store.js';
 import { calculateTipPoints, isMatchFinished } from './scoring.js';
 import { syncOpenFootball } from './syncOpenFootball.js';
@@ -122,29 +122,24 @@ app.get('/api/me', async (req, res) => {
 app.post('/api/register', async (req, res) => {
   const name = String(req.body.name || '').trim();
   const nickname = String(req.body.nickname || '').trim();
-  const email = String(req.body.email || '').trim().toLowerCase();
+  const inviteCode = String(req.body.inviteCode || '');
   const password = String(req.body.password || '');
 
-  if (!name || !nickname || !email || !password) {
-    return res.status(400).json({ error: 'Name, nickname, email, and password are required.' });
+  if (!name || !nickname || !inviteCode || !password) {
+    return res.status(400).json({ error: 'Všechna pole jsou povinná.' });
   }
-  if (!email.endsWith('@cts-tradeit.cz')) {
+  if (inviteCode !== (process.env.INVITE_CODE || 'Hardy007')) {
     return res.status(403).json({ error: 'Registrace pouze pro zvané.' });
   }
   if (password.length < 8) {
-    return res.status(400).json({ error: 'Password must be at least 8 characters.' });
+    return res.status(400).json({ error: 'Heslo musí mít alespoň 8 znaků.' });
   }
 
-  const [nicknameTaken, emailTaken] = await Promise.all([
-    getUserByNickname(nickname),
-    getUserByEmail(email)
-  ]);
-
-  if (nicknameTaken) return res.status(409).json({ error: 'This nickname is already taken.' });
-  if (emailTaken) return res.status(409).json({ error: 'This email is already registered.' });
+  const nicknameTaken = await getUserByNickname(nickname);
+  if (nicknameTaken) return res.status(409).json({ error: 'Tato přezdívka je již obsazena.' });
 
   const passwordHash = await bcrypt.hash(password, 12);
-  const user = await createUser({ name, nickname, email, passwordHash });
+  const user = await createUser({ name, nickname, email: null, passwordHash });
   req.session.userId = user.id;
 
   res.status(201).json({ user: publicUser(user) });
@@ -207,9 +202,7 @@ app.post('/api/tips/:matchId/captain', requireAuth, async (req, res) => {
   if (!match) return res.status(404).json({ error: 'Match not found.' });
   if (matchIsTipLocked(match)) return res.status(423).json({ error: 'Tips are locked 5 minutes before kick-off.' });
 
-  const tip = await getTipByUserAndMatch(req.session.userId, matchId);
-  if (!tip) return res.status(400).json({ error: 'Save your tip first before setting captain.' });
-
+  await ensureTipRow(req.session.userId, matchId);
   const [allMatches, userTips] = await Promise.all([getAllMatches(), getTipsByUser(req.session.userId)]);
   const section = matchSectionKey(match.round);
   const sectionMatches = allMatches.filter((m) => matchSectionKey(m.round) === section);
@@ -294,9 +287,7 @@ app.post('/api/tips/:matchId/bonus', requireAuth, async (req, res) => {
   if (!match) return res.status(404).json({ error: 'Match not found.' });
   if (matchIsTipLocked(match)) return res.status(423).json({ error: 'Tips are locked 5 minutes before kick-off.' });
 
-  const tip = await getTipByUserAndMatch(req.session.userId, matchId);
-  if (!tip) return res.status(400).json({ error: 'Save your tip first before setting a bonus pick.' });
-
+  await ensureTipRow(req.session.userId, matchId);
   const bonusPlayer = String(req.body.bonusPlayer || '').trim() || null;
   await saveBonusTip(req.session.userId, matchId, bonusPlayer);
   res.json({ ok: true });
