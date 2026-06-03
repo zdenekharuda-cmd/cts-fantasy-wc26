@@ -20,9 +20,9 @@
     <div class="toolbar">
       <div>
         <h1>Tip</h1>
-        <p>Enter or update your score prediction until 5 minutes before kick-off.</p>
+        <p>Zadej nebo uprav svůj tip nejpozději 5 minut před výkopem.</p>
       </div>
-      <input id="filterInput" placeholder="Filter team, city, round...">
+      <input id="filterInput" placeholder="Filtrovat tým, město, kolo...">
     </div>
     <div id="matches" class="match-list"></div>
   </main>
@@ -66,7 +66,7 @@
         .sort((a, b) => new Date(a.kickoffUtc) - new Date(b.kickoffUtc));
 
       if (!visible.length) {
-        list.innerHTML = `<div class="empty">No matches found. If this is a fresh installation, run <b>npm run sync:matches</b> first.</div>`;
+        list.innerHTML = `<div class="empty">Žádné zápasy nenalezeny.</div>`;
         return;
       }
 
@@ -104,19 +104,19 @@
 
     function matchCard(match, sectionLocked = false) {
       const statusClass = match.finished ? 'finished' : match.locked ? 'locked' : '';
-      const statusLabel = match.finished ? `Finished ${match.homeScore}:${match.awayScore}` : match.locked ? 'Locked' : 'Open';
+      const statusLabel = match.finished ? `Dokončeno ${match.homeScore}:${match.awayScore}` : match.locked ? 'Uzamčeno' : 'Otevřeno';
       const tip = match.tip || {};
       const disabled = match.locked || match.finished ? 'disabled' : '';
       const isCaptain = tip.isCaptain ?? false;
       const hasTip = match.tip !== null;
       const points = match.tip?.points ?? null;
       const tipNote = match.finished && match.tip
-        ? `Your tip: ${tip.homeScore}:${tip.awayScore}${isCaptain ? ' 👑' : ''} · ${points} point${points === 1 ? '' : 's'}${isCaptain ? ' (2×)' : ''}`
+        ? `Tvůj tip: ${tip.homeScore}:${tip.awayScore}${isCaptain ? ' 👑' : ''} · ${points} ${points === 1 ? 'bod' : points >= 2 && points <= 4 ? 'body' : 'bodů'}${isCaptain ? ' (2×)' : ''}`
         : match.tip
-          ? `Saved tip: ${tip.homeScore}:${tip.awayScore}${isCaptain ? ' 👑' : ''}`
+          ? `Uložený tip: ${tip.homeScore}:${tip.awayScore}${isCaptain ? ' 👑' : ''}`
           : match.locked
-            ? 'No changes allowed now.'
-            : 'No tip saved yet.';
+            ? 'Tip již nelze měnit.'
+            : 'Tip zatím nezadán.';
 
       const captainDisabled = !hasTip || match.locked || sectionLocked;
       const captainSlot = match.finished
@@ -130,7 +130,7 @@
             title="${sectionLocked ? 'Kolo uzamčeno — kapitán nelze změnit' : isCaptain ? 'Odebrat kapitána' : 'Označit jako kapitán (2× body)'}"
           >👑</button>`;
 
-      const saveBtn = match.finished ? '' : `<button type="submit" ${match.locked ? 'disabled' : ''}>Save tip</button>`;
+      const saveBtn = match.finished ? '' : `<button type="submit" ${match.locked ? 'disabled' : ''}>Uložit tip</button>`;
 
       const bonusPanel = isCzechMatch(match) ? (() => {
         const current = tip.bonusPlayer ?? '';
@@ -210,7 +210,7 @@
       const note = document.getElementById(`bonus-note-${matchId}`);
       try {
         await api(`/api/tips/${matchId}/bonus`, { method: 'POST', body: { bonusPlayer: select.value } });
-        setMessage(note, select.value ? `Uloženo: ${select.value}` : 'Bonusový tip odebrán.', 'success');
+        setMessage(note, select.value ? `Uloženo: ${select.value}` : 'Bonusový tip odebán.', 'success');
         await loadMatches(false);
       } catch (error) {
         setMessage(note, error.message, 'error');

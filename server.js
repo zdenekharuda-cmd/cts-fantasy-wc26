@@ -302,6 +302,44 @@ app.post('/api/tips/:matchId/bonus', requireAuth, async (req, res) => {
   res.json({ ok: true });
 });
 
+app.get('/api/scoreboard/:userId/tips', async (req, res) => {
+  const userId = Number(req.params.userId);
+  if (!Number.isInteger(userId)) return res.status(400).json({ error: 'Invalid user id.' });
+
+  const [matches, tips] = await Promise.all([getAllMatches(), getTipsByUser(userId)]);
+  const matchById = new Map(matches.map((m) => [m.id, m]));
+
+  const scored = tips
+    .map((tip) => {
+      const match = matchById.get(Number(tip.matchId));
+      if (!match || !isMatchFinished(match)) return null;
+      const base = calculateTipPoints(tip, match) ?? 0;
+      const points = tip.isCaptain ? base * 2 : base;
+      const bonusHit = tip.bonusPlayer && Array.isArray(match.czechScorers) && match.czechScorers.includes(tip.bonusPlayer);
+      return {
+        matchId: match.id,
+        kickoffUtc: match.kickoffUtc,
+        teamHome: match.teamHome,
+        teamAway: match.teamAway,
+        homeFlag: match.homeFlag,
+        awayFlag: match.awayFlag,
+        actualHome: match.homeScore,
+        actualAway: match.awayScore,
+        tipHome: tip.homeScore,
+        tipAway: tip.awayScore,
+        isCaptain: tip.isCaptain ?? false,
+        bonusPlayer: tip.bonusPlayer ?? null,
+        bonusHit: bonusHit ?? false,
+        basePoints: base,
+        points,
+      };
+    })
+    .filter(Boolean)
+    .sort((a, b) => new Date(a.kickoffUtc) - new Date(b.kickoffUtc));
+
+  res.json({ tips: scored });
+});
+
 app.post('/api/admin/matches/:matchId/scorers', requireAdmin, async (req, res) => {
   const matchId = Number(req.params.matchId);
   if (!Number.isInteger(matchId)) return res.status(400).json({ error: 'Invalid match id.' });

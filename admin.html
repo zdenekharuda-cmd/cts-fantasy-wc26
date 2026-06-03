@@ -15,19 +15,19 @@
   <main class="container">
     <section class="card">
       <h1>Admin</h1>
-      <p>Optional page for syncing fixtures/results and entering final scores manually.</p>
+      <p>Synchronizace zápasů a ruční zadání výsledků.</p>
       <label for="adminToken">Admin token</label>
-      <input id="adminToken" type="password" placeholder="ADMIN_TOKEN from .env">
+      <input id="adminToken" type="password" placeholder="ADMIN_TOKEN">
       <div class="form-actions">
-        <button id="saveTokenBtn">Save token in this browser</button>
-        <button id="syncBtn">Sync from OpenFootball</button>
+        <button id="saveTokenBtn">Uložit token v prohlížeči</button>
+        <button id="syncBtn">Synchronizovat zápasy</button>
       </div>
       <div id="message" class="message"></div>
     </section>
     <section class="card" style="margin-top:18px;">
       <div class="toolbar">
-        <h2>Final score entry</h2>
-        <input id="filterInput" placeholder="Filter team, city, round...">
+        <h2>Zadání výsledků</h2>
+        <input id="filterInput" placeholder="Filtrovat tým, město, kolo...">
       </div>
       <div id="matches" class="match-list"></div>
     </section>
@@ -92,14 +92,14 @@
             <b>${escapeHtml(match.round)}</b>${match.group ? ` · ${escapeHtml(match.group)}` : ''}<br>
             ${escapeHtml(formatKickoff(match.kickoffUtc))}<br>
             ${escapeHtml(match.venue)}<br>
-            Current status: <b>${escapeHtml(match.status)}</b>
+            Stav: <b>${escapeHtml(match.status === 'FINISHED' ? 'Dokončeno' : match.status === 'SCHEDULED' ? 'Naplánováno' : match.status)}</b>
           </div>
           <form class="result-form" data-result-form data-match-id="${match.id}">
             <input type="number" min="0" max="99" name="homeScore" value="${match.homeScore ?? ''}" required aria-label="Home final score">
             <span class="dash">:</span>
             <input type="number" min="0" max="99" name="awayScore" value="${match.awayScore ?? ''}" required aria-label="Away final score">
-            <button type="submit">Mark finished</button>
-            ${match.status === 'FINISHED' ? `<button type="button" class="btn-unfinish" data-unfinish data-match-id="${match.id}">Unmark</button>` : ''}
+            <button type="submit">Uložit výsledek</button>
+            ${match.status === 'FINISHED' ? `<button type="button" class="btn-unfinish" data-unfinish data-match-id="${match.id}">Zrušit výsledek</button>` : ''}
             <div class="tip-note" id="result-note-${match.id}"></div>
           </form>
           ${(match.teamHome === 'Czech Republic' || match.teamAway === 'Czech Republic') ? `
@@ -138,7 +138,7 @@
       const body = Object.fromEntries(new FormData(form));
       try {
         await api(`/api/admin/matches/${matchId}/result`, { method: 'POST', headers: adminHeaders(), body });
-        setMessage(note, 'Result saved.', 'success');
+        setMessage(note, 'Výsledek uložen.', 'success');
         await loadMatches(false);
       } catch (error) {
         setMessage(note, error.message, 'error');
@@ -183,7 +183,7 @@
       const note = document.getElementById(`result-note-${matchId}`);
       try {
         await api(`/api/admin/matches/${matchId}/result`, { method: 'DELETE', headers: adminHeaders() });
-        setMessage(note, 'Result cleared.', 'success');
+        setMessage(note, 'Výsledek zrušen.', 'success');
         await loadMatches(false);
       } catch (error) {
         setMessage(note, error.message, 'error');

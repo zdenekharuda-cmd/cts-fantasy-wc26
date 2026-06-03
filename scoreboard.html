@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en">
+<html lang="cs">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -7,32 +7,33 @@
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flag-icons/css/flag-icons.min.css">
   <link rel="stylesheet" href="/styles.css">
 </head>
-<img src="/images/cts-logo.png" alt="CTS logo" class="logo-top-right" />
-<img src="/images/zdenek.png" alt="Profile photo" class="avatar" />  
 <body>
   <header class="topbar">
-    <div class="logo">CTS fantasy WC '26</div>
+    <div class="brand">
+      <img src="/images/cts-logo.png" alt="CTS logo">
+      <span>CTS fantasy WC '26</span>
+    </div>
     <nav class="nav" data-nav></nav>
   </header>
   <main class="container">
-    <section class="card">
+    <section class="card card--wide">
       <div class="toolbar">
         <div>
           <h1>Scoreboard</h1>
-          <p id="summary">Loading...</p>
+          <p id="summary">Načítám...</p>
         </div>
-        <button id="refreshBtn">Refresh</button>
+        <button id="refreshBtn">Obnovit</button>
       </div>
       <div class="table-wrap">
-        <table>
+        <table class="scoreboard-table">
           <thead>
             <tr>
               <th>#</th>
-              <th>Nickname</th>
-              <th>Name</th>
-              <th>Total points</th>
-              <th>Exact scores</th>
-              <th>Scored tips</th>
+              <th>Přezdívka</th>
+              <th>Jméno</th>
+              <th>Body</th>
+              <th>Přesné výsledky</th>
+              <th>Vyhodnocených tipů</th>
             </tr>
           </thead>
           <tbody id="scoreRows"></tbody>
@@ -41,21 +42,22 @@
     </section>
   </main>
   <script type="module">
-    import { api, escapeHtml } from '/common.js';
+    import { api, escapeHtml, flagSpan, formatKickoff } from '/common.js';
 
     const rows = document.getElementById('scoreRows');
     const summary = document.getElementById('summary');
     const refreshBtn = document.getElementById('refreshBtn');
+    const openRows = new Set();
 
     async function load() {
       const data = await api('/api/scoreboard');
-      summary.textContent = `${data.finishedMatches} finished matches counted.`;
+      summary.textContent = `${data.finishedMatches} vyhodnocených zápasů.`;
       if (!data.users.length) {
-        rows.innerHTML = `<tr><td colspan="6" class="muted">No users yet.</td></tr>`;
+        rows.innerHTML = `<tr><td colspan="6" class="muted">Zatím žádní hráči.</td></tr>`;
         return;
       }
       rows.innerHTML = data.users.map((user, index) => `
-        <tr>
+        <tr class="scoreboard-row" data-user-id="${user.userId}" style="cursor:pointer">
           <td class="rank">${index + 1}</td>
           <td><b>${escapeHtml(user.nickname)}</b></td>
           <td>${escapeHtml(user.name)}</td>
@@ -63,7 +65,81 @@
           <td>${user.exactScores}</td>
           <td>${user.scoredTips}</td>
         </tr>
+        <tr class="detail-row" id="detail-${user.userId}" style="display:none">
+          <td colspan="6" class="detail-cell">
+            <div class="detail-loading">Načítám...</div>
+          </td>
+        </tr>
       `).join('');
+
+      document.querySelectorAll('.scoreboard-row').forEach((row) => {
+        row.addEventListener('click', () => toggleDetail(row.dataset.userId));
+      });
+
+      for (const userId of openRows) {
+        const detailRow = document.getElementById(`detail-${userId}`);
+        if (detailRow) {
+          detailRow.style.display = '';
+          loadDetail(userId);
+        }
+      }
+    }
+
+    async function toggleDetail(userId) {
+      const detailRow = document.getElementById(`detail-${userId}`);
+      if (!detailRow) return;
+      const isOpen = detailRow.style.display !== 'none';
+      if (isOpen) {
+        detailRow.style.display = 'none';
+        openRows.delete(userId);
+      } else {
+        detailRow.style.display = '';
+        openRows.add(userId);
+        await loadDetail(userId);
+      }
+    }
+
+    async function loadDetail(userId) {
+      const detailRow = document.getElementById(`detail-${userId}`);
+      const cell = detailRow.querySelector('.detail-cell');
+      try {
+        const data = await api(`/api/scoreboard/${userId}/tips`);
+        if (!data.tips.length) {
+          cell.innerHTML = `<p class="muted" style="padding:8px 0">Žádné vyhodnocené tipy.</p>`;
+          return;
+        }
+        cell.innerHTML = `
+          <table class="detail-table">
+            <thead>
+              <tr>
+                <th>Zápas</th>
+                <th>Datum</th>
+                <th>Výsledek</th>
+                <th>Tip</th>
+                <th>Body</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${data.tips.map((t) => {
+                const captainBadge = t.isCaptain ? ' <span class="badge-captain">👑</span>' : '';
+                const bonusBadge = t.bonusPlayer
+                  ? ` <span class="badge-bonus ${t.bonusHit ? 'hit' : 'miss'}" title="${escapeHtml(t.bonusPlayer)}">🎯${t.bonusHit ? '+2' : '✗'}</span>`
+                  : '';
+                const pointsClass = t.points >= 3 ? 'points-high' : t.points >= 1 ? 'points-mid' : 'points-zero';
+                return `
+                  <tr>
+                    <td>${flagSpan(t.homeFlag)} ${escapeHtml(t.teamHome)} – ${flagSpan(t.awayFlag)} ${escapeHtml(t.teamAway)}</td>
+                    <td class="muted">${escapeHtml(formatKickoff(t.kickoffUtc))}</td>
+                    <td><b>${t.actualHome}:${t.actualAway}</b></td>
+                    <td>${t.tipHome}:${t.tipAway}${captainBadge}${bonusBadge}</td>
+                    <td class="detail-points ${pointsClass}">${t.points}</td>
+                  </tr>`;
+              }).join('')}
+            </tbody>
+          </table>`;
+      } catch {
+        cell.innerHTML = `<p class="muted" style="padding:8px 0">Chyba při načítání.</p>`;
+      }
     }
 
     refreshBtn.addEventListener('click', load);
