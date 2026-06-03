@@ -74,7 +74,7 @@ function matchSectionKey(round) {
   const num = parseInt((round || '').replace('Matchday ', ''), 10);
   if (!isNaN(num)) {
     if (num <= 7) return '1';
-    if (num <= 14) return '2';
+    if (num <= 13) return '2';
     return '3';
   }
   return 'knockout';
