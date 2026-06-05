@@ -1,0 +1,302 @@
+<!doctype html>
+<html lang="cs">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Bonusové tipy | CTS fantasy WC '26</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flag-icons/css/flag-icons.min.css">
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <img src="/images/cts-logo.png" alt="CTS logo">
+      <span>CTS fantasy WC '26</span>
+    </div>
+    <nav class="nav" data-nav></nav>
+  </header>
+  <main class="container">
+    <section class="card card--wide">
+      <h1>Bonusové tipy</h1>
+      <p>Vyber tři nejlepší týmy celého turnaje. Tip lze měnit až do začátku prvního zápasu.</p>
+
+      <div id="lockedBanner" class="locked-banner" style="display:none">
+        🔒 Bonusové tipy jsou uzamčeny — turnaj již začal.
+      </div>
+
+      <form id="picksForm" class="bonus-picks-form">
+        <div class="bonus-pick-row">
+          <span class="bonus-place gold">🥇 1. místo</span>
+          <select name="firstTeam" id="firstTeam" required>
+            <option value="">— vyber tým —</option>
+          </select>
+        </div>
+        <div class="bonus-pick-row">
+          <span class="bonus-place silver">🥈 2. místo</span>
+          <select name="secondTeam" id="secondTeam" required>
+            <option value="">— vyber tým —</option>
+          </select>
+        </div>
+        <div class="bonus-pick-row">
+          <span class="bonus-place bronze">🥉 3. místo</span>
+          <select name="thirdTeam" id="thirdTeam" required>
+            <option value="">— vyber tým —</option>
+          </select>
+        </div>
+        <div class="form-actions">
+          <button type="submit" id="saveBtn">Uložit tipy</button>
+        </div>
+        <div id="message" class="message"></div>
+      </form>
+
+      <hr style="margin:32px 0; border:none; border-top:1px solid #e0f0e0">
+
+      <h2>⚽ Nejlepší střelec turnaje</h2>
+      <p>Vyber hráče, který vstřelí nejvíce gólů na celém turnaji.</p>
+
+      <form id="scorerForm" class="bonus-picks-form">
+        <div class="bonus-pick-row">
+          <span class="bonus-place" style="min-width:70px">Tým</span>
+          <select id="scorerTeam" name="scorerTeam">
+            <option value="">— vyber tým —</option>
+          </select>
+        </div>
+        <div class="bonus-pick-row">
+          <span class="bonus-place" style="min-width:70px">Hráč</span>
+          <select id="scorerPlayer" name="scorerPlayer" disabled>
+            <option value="">— nejdřív vyber tým —</option>
+          </select>
+        </div>
+        <div class="form-actions">
+          <button type="submit" id="scorerSaveBtn" disabled>Uložit střelce</button>
+        </div>
+        <div id="scorerMessage" class="message"></div>
+      </form>
+
+      <hr style="margin:32px 0; border:none; border-top:1px solid #e0f0e0">
+
+      <h2>🎯 Nejlepší asistent turnaje</h2>
+      <p>Vyber hráče, který rozdá nejvíce gólových přihrávek na celém turnaji.</p>
+
+      <form id="assisterForm" class="bonus-picks-form">
+        <div class="bonus-pick-row">
+          <span class="bonus-place" style="min-width:70px">Tým</span>
+          <select id="assisterTeam" name="assisterTeam">
+            <option value="">— vyber tým —</option>
+          </select>
+        </div>
+        <div class="bonus-pick-row">
+          <span class="bonus-place" style="min-width:70px">Hráč</span>
+          <select id="assisterPlayer" name="assisterPlayer" disabled>
+            <option value="">— nejdřív vyber tým —</option>
+          </select>
+        </div>
+        <div class="form-actions">
+          <button type="submit" id="assisterSaveBtn" disabled>Uložit asistenta</button>
+        </div>
+        <div id="assisterMessage" class="message"></div>
+      </form>
+
+      <hr style="margin:32px 0; border:none; border-top:1px solid #e0f0e0">
+
+      <h2>Tipy ostatních</h2>
+      <div id="otherPicks" class="other-picks-wrap">Načítám...</div>
+    </section>
+  </main>
+  <script type="module">
+    import { api, escapeHtml, flagSpan, requireLogin, setMessage } from '/common.js';
+    import { PLAYERS_BY_TEAM } from '/players.js';
+
+    let teams = [];
+    let locked = false;
+
+    const form = document.getElementById('picksForm');
+    const message = document.getElementById('message');
+    const saveBtn = document.getElementById('saveBtn');
+    const lockedBanner = document.getElementById('lockedBanner');
+    const selects = {
+      firstTeam: document.getElementById('firstTeam'),
+      secondTeam: document.getElementById('secondTeam'),
+      thirdTeam: document.getElementById('thirdTeam'),
+    };
+
+    function buildOptions(selectedValue) {
+      return teams.map(t =>
+        `<option value="${escapeHtml(t.team)}" ${t.team === selectedValue ? 'selected' : ''}>
+          ${t.team}
+        </option>`
+      ).join('');
+    }
+
+    function populateSelects(picks) {
+      for (const [key, select] of Object.entries(selects)) {
+        const current = picks?.[key] ?? '';
+        select.innerHTML = `<option value="">— vyber tým —</option>${buildOptions(current)}`;
+        select.disabled = locked;
+      }
+      saveBtn.disabled = locked;
+      scorerTeamSelect.disabled = locked;
+      scorerSaveBtn.disabled = locked;
+      if (locked) lockedBanner.style.display = '';
+
+      assisterTeamSelect.disabled = locked;
+      assisterSaveBtn.disabled = locked;
+
+      if (picks?.scorerTeam) {
+        scorerTeamSelect.value = picks.scorerTeam;
+        updatePlayerSelect(picks.scorerTeam, picks.scorerPlayer ?? '');
+      }
+      if (picks?.assisterTeam) {
+        assisterTeamSelect.value = picks.assisterTeam;
+        updateAssisterPlayerSelect(picks.assisterTeam, picks.assisterPlayer ?? '');
+      }
+    }
+
+    function renderOtherPicks(picks) {
+      const wrap = document.getElementById('otherPicks');
+      if (!locked) {
+        wrap.innerHTML = `<p class="muted">Tipy ostatních budou zveřejněny po uzamčení turnaje.</p>`;
+        return;
+      }
+      if (!picks.length) {
+        wrap.innerHTML = `<p class="muted">Zatím nikdo nevybral.</p>`;
+        return;
+      }
+      wrap.innerHTML = `
+        <table class="scoreboard-table">
+          <thead>
+            <tr><th>Hráč</th><th>🥇 1. místo</th><th>🥈 2. místo</th><th>🥉 3. místo</th><th>⚽ Střelec</th><th>🎯 Asistent</th></tr>
+          </thead>
+          <tbody>
+            ${picks.map(p => `
+              <tr>
+                <td><b>${escapeHtml(p.nickname)}</b></td>
+                <td>${p.firstTeam ? escapeHtml(p.firstTeam) : '<span class="muted">—</span>'}</td>
+                <td>${p.secondTeam ? escapeHtml(p.secondTeam) : '<span class="muted">—</span>'}</td>
+                <td>${p.thirdTeam ? escapeHtml(p.thirdTeam) : '<span class="muted">—</span>'}</td>
+                <td>${p.scorerPlayer ? `${escapeHtml(p.scorerPlayer)} <span class="muted">(${escapeHtml(p.scorerTeam)})</span>` : '<span class="muted">—</span>'}</td>
+                <td>${p.assisterPlayer ? `${escapeHtml(p.assisterPlayer)} <span class="muted">(${escapeHtml(p.assisterTeam)})</span>` : '<span class="muted">—</span>'}</td>
+              </tr>`).join('')}
+          </tbody>
+        </table>`;
+    }
+
+    const scorerTeamSelect = document.getElementById('scorerTeam');
+    const scorerPlayerSelect = document.getElementById('scorerPlayer');
+    const scorerSaveBtn = document.getElementById('scorerSaveBtn');
+    const scorerMessage = document.getElementById('scorerMessage');
+    const scorerForm = document.getElementById('scorerForm');
+
+    const teamNames = Object.keys(PLAYERS_BY_TEAM).sort();
+    scorerTeamSelect.innerHTML = `<option value="">— vyber tým —</option>` +
+      teamNames.map(t => `<option value="${escapeHtml(t)}">${escapeHtml(t)}</option>`).join('');
+
+    function updatePlayerSelect(selectedTeam, selectedPlayer) {
+      const players = PLAYERS_BY_TEAM[selectedTeam] || [];
+      if (!players.length) {
+        scorerPlayerSelect.innerHTML = `<option value="">— vyber tým —</option>`;
+        scorerPlayerSelect.disabled = true;
+        scorerSaveBtn.disabled = true;
+        return;
+      }
+      scorerPlayerSelect.innerHTML = `<option value="">— vyber hráče —</option>` +
+        players.map(p => `<option value="${escapeHtml(p)}" ${p === selectedPlayer ? 'selected' : ''}>${escapeHtml(p)}</option>`).join('');
+      scorerPlayerSelect.disabled = locked;
+      scorerSaveBtn.disabled = locked;
+    }
+
+    scorerTeamSelect.addEventListener('change', () => updatePlayerSelect(scorerTeamSelect.value, ''));
+    scorerForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const scorerTeam = scorerTeamSelect.value;
+      const scorerPlayer = scorerPlayerSelect.value;
+      if (!scorerTeam || !scorerPlayer) {
+        setMessage(scorerMessage, 'Vyber tým i hráče.', 'error');
+        return;
+      }
+      try {
+        await api('/api/tournament/scorer', { method: 'POST', body: { scorerTeam, scorerPlayer } });
+        setMessage(scorerMessage, `Uloženo: ${scorerPlayer} (${scorerTeam})`, 'success');
+        const allPicks = await api('/api/tournament/picks');
+        renderOtherPicks(allPicks.picks);
+      } catch (err) {
+        setMessage(scorerMessage, err.message, 'error');
+      }
+    });
+
+    const assisterTeamSelect = document.getElementById('assisterTeam');
+    const assisterPlayerSelect = document.getElementById('assisterPlayer');
+    const assisterSaveBtn = document.getElementById('assisterSaveBtn');
+    const assisterMessage = document.getElementById('assisterMessage');
+    const assisterForm = document.getElementById('assisterForm');
+
+    assisterTeamSelect.innerHTML = `<option value="">— vyber tým —</option>` +
+      teamNames.map(t => `<option value="${escapeHtml(t)}">${escapeHtml(t)}</option>`).join('');
+
+    function updateAssisterPlayerSelect(selectedTeam, selectedPlayer) {
+      const players = PLAYERS_BY_TEAM[selectedTeam] || [];
+      if (!players.length) {
+        assisterPlayerSelect.innerHTML = `<option value="">— vyber tým —</option>`;
+        assisterPlayerSelect.disabled = true;
+        assisterSaveBtn.disabled = true;
+        return;
+      }
+      assisterPlayerSelect.innerHTML = `<option value="">— vyber hráče —</option>` +
+        players.map(p => `<option value="${escapeHtml(p)}" ${p === selectedPlayer ? 'selected' : ''}>${escapeHtml(p)}</option>`).join('');
+      assisterPlayerSelect.disabled = locked;
+      assisterSaveBtn.disabled = locked;
+    }
+
+    assisterTeamSelect.addEventListener('change', () => updateAssisterPlayerSelect(assisterTeamSelect.value, ''));
+
+    assisterForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const assisterTeam = assisterTeamSelect.value;
+      const assisterPlayer = assisterPlayerSelect.value;
+      if (!assisterTeam || !assisterPlayer) {
+        setMessage(assisterMessage, 'Vyber tým i hráče.', 'error');
+        return;
+      }
+      try {
+        await api('/api/tournament/assister', { method: 'POST', body: { assisterTeam, assisterPlayer } });
+        setMessage(assisterMessage, `Uloženo: ${assisterPlayer} (${assisterTeam})`, 'success');
+        const allPicks = await api('/api/tournament/picks');
+        renderOtherPicks(allPicks.picks);
+      } catch (err) {
+        setMessage(assisterMessage, err.message, 'error');
+      }
+    });
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const body = Object.fromEntries(new FormData(form));
+      const chosen = [body.firstTeam, body.secondTeam, body.thirdTeam].filter(Boolean);
+      if (new Set(chosen).size !== chosen.length) {
+        setMessage(message, 'Každý tým lze vybrat pouze jednou.', 'error');
+        return;
+      }
+      try {
+        await api('/api/tournament/picks', { method: 'POST', body });
+        setMessage(message, 'Tipy uloženy.', 'success');
+        const allPicks = await api('/api/tournament/picks');
+        renderOtherPicks(allPicks.picks);
+      } catch (err) {
+        setMessage(message, err.message, 'error');
+      }
+    });
+
+    await requireLogin();
+
+    const [teamsData, myData, allPicks] = await Promise.all([
+      api('/api/tournament/teams'),
+      api('/api/tournament/picks/me'),
+      api('/api/tournament/picks'),
+    ]);
+
+    teams = teamsData.teams;
+    locked = myData.locked;
+    populateSelects(myData.picks);
+    renderOtherPicks(allPicks.picks);
+  </script>
+</body>
+</html>

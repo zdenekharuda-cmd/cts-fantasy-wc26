@@ -9,7 +9,8 @@ import { initDb } from './db.js';
 import {
   getAllUsers, getUserById, getUserByNickname, getUserByEmail, createUser,
   getAllMatches, getMatchById, setMatchResult, resetMatchResult,
-  getTipsByUser, getAllTips, upsertTip, setCaptain, removeCaptain, getTipByUserAndMatch, saveBonusTip, setCzechScorers, ensureTipRow
+  getTipsByUser, getAllTips, upsertTip, setCaptain, removeCaptain, getTipByUserAndMatch, saveBonusTip, setCzechScorers, ensureTipRow,
+  getGroupTeams, getTournamentPicks, getAllTournamentPicks, saveTournamentPicks, saveScorerPick, saveAssisterPick
 } from './store.js';
 import { calculateTipPoints, isMatchFinished } from './scoring.js';
 import { syncOpenFootball } from './syncOpenFootball.js';
@@ -329,6 +330,63 @@ app.get('/api/scoreboard/:userId/tips', async (req, res) => {
     .sort((a, b) => new Date(a.kickoffUtc) - new Date(b.kickoffUtc));
 
   res.json({ tips: scored });
+});
+
+app.get('/api/tournament/teams', async (req, res) => {
+  const teams = await getGroupTeams();
+  res.json({ teams });
+});
+
+app.get('/api/tournament/picks/me', requireAuth, async (req, res) => {
+  const picks = await getTournamentPicks(req.session.userId);
+  const allMatches = await getAllMatches();
+  const firstMatch = allMatches.reduce((min, m) => !min || new Date(m.kickoffUtc) < new Date(min.kickoffUtc) ? m : min, null);
+  const locked = firstMatch ? matchIsTipLocked(firstMatch) : false;
+  res.json({ picks, locked });
+});
+
+app.get('/api/tournament/picks', async (req, res) => {
+  const picks = await getAllTournamentPicks();
+  res.json({ picks });
+});
+
+app.post('/api/tournament/assister', requireAuth, async (req, res) => {
+  const allMatches = await getAllMatches();
+  const firstMatch = allMatches.reduce((min, m) => !min || new Date(m.kickoffUtc) < new Date(min.kickoffUtc) ? m : min, null);
+  if (firstMatch && matchIsTipLocked(firstMatch)) {
+    return res.status(423).json({ error: 'Turnajové tipy jsou uzamčeny — první zápas již začal.' });
+  }
+  const { assisterTeam, assisterPlayer } = req.body;
+  await saveAssisterPick(req.session.userId, { assisterTeam, assisterPlayer });
+  res.json({ ok: true });
+});
+
+app.post('/api/tournament/scorer', requireAuth, async (req, res) => {
+  const allMatches = await getAllMatches();
+  const firstMatch = allMatches.reduce((min, m) => !min || new Date(m.kickoffUtc) < new Date(min.kickoffUtc) ? m : min, null);
+  if (firstMatch && matchIsTipLocked(firstMatch)) {
+    return res.status(423).json({ error: 'Turnajové tipy jsou uzamčeny — první zápas již začal.' });
+  }
+  const { scorerTeam, scorerPlayer } = req.body;
+  await saveScorerPick(req.session.userId, { scorerTeam, scorerPlayer });
+  res.json({ ok: true });
+});
+
+app.post('/api/tournament/picks', requireAuth, async (req, res) => {
+  const allMatches = await getAllMatches();
+  const firstMatch = allMatches.reduce((min, m) => !min || new Date(m.kickoffUtc) < new Date(min.kickoffUtc) ? m : min, null);
+  if (firstMatch && matchIsTipLocked(firstMatch)) {
+    return res.status(423).json({ error: 'Turnajové tipy jsou uzamčeny — první zápas již začal.' });
+  }
+
+  const { firstTeam, secondTeam, thirdTeam } = req.body;
+  const teams = new Set([firstTeam, secondTeam, thirdTeam].filter(Boolean));
+  if (teams.size !== [firstTeam, secondTeam, thirdTeam].filter(Boolean).length) {
+    return res.status(400).json({ error: 'Každý tým lze vybrat pouze jednou.' });
+  }
+
+  await saveTournamentPicks(req.session.userId, { firstTeam, secondTeam, thirdTeam });
+  res.json({ ok: true });
 });
 
 app.post('/api/admin/matches/:matchId/scorers', requireAdmin, async (req, res) => {

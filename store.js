@@ -139,6 +139,77 @@ export async function getAllTips() {
   return rows;
 }
 
+export async function getGroupTeams() {
+  const { rows } = await pool.query(`
+    SELECT DISTINCT team_home AS team, home_flag AS flag FROM matches WHERE "group" IS NOT NULL
+    UNION
+    SELECT DISTINCT team_away, away_flag FROM matches WHERE "group" IS NOT NULL
+    ORDER BY team
+  `);
+  return rows;
+}
+
+export async function getTournamentPicks(userId) {
+  const { rows } = await pool.query(
+    `SELECT first_team AS "firstTeam", second_team AS "secondTeam", third_team AS "thirdTeam",
+            scorer_team AS "scorerTeam", scorer_player AS "scorerPlayer",
+            assister_team AS "assisterTeam", assister_player AS "assisterPlayer",
+            updated_at AS "updatedAt"
+     FROM tournament_picks WHERE user_id = $1`,
+    [userId]
+  );
+  return rows[0] ?? null;
+}
+
+export async function getAllTournamentPicks() {
+  const { rows } = await pool.query(
+    `SELECT u.id AS "userId", u.nickname, u.name,
+            tp.first_team AS "firstTeam", tp.second_team AS "secondTeam", tp.third_team AS "thirdTeam",
+            tp.scorer_team AS "scorerTeam", tp.scorer_player AS "scorerPlayer",
+            tp.assister_team AS "assisterTeam", tp.assister_player AS "assisterPlayer"
+     FROM users u LEFT JOIN tournament_picks tp ON tp.user_id = u.id
+     ORDER BY u.nickname`
+  );
+  return rows;
+}
+
+export async function saveTournamentPicks(userId, { firstTeam, secondTeam, thirdTeam }) {
+  await pool.query(
+    `INSERT INTO tournament_picks (user_id, first_team, second_team, third_team)
+     VALUES ($1, $2, $3, $4)
+     ON CONFLICT (user_id) DO UPDATE SET
+       first_team = EXCLUDED.first_team,
+       second_team = EXCLUDED.second_team,
+       third_team = EXCLUDED.third_team,
+       updated_at = NOW()`,
+    [userId, firstTeam || null, secondTeam || null, thirdTeam || null]
+  );
+}
+
+export async function saveAssisterPick(userId, { assisterTeam, assisterPlayer }) {
+  await pool.query(
+    `INSERT INTO tournament_picks (user_id, assister_team, assister_player)
+     VALUES ($1, $2, $3)
+     ON CONFLICT (user_id) DO UPDATE SET
+       assister_team = EXCLUDED.assister_team,
+       assister_player = EXCLUDED.assister_player,
+       updated_at = NOW()`,
+    [userId, assisterTeam || null, assisterPlayer || null]
+  );
+}
+
+export async function saveScorerPick(userId, { scorerTeam, scorerPlayer }) {
+  await pool.query(
+    `INSERT INTO tournament_picks (user_id, scorer_team, scorer_player)
+     VALUES ($1, $2, $3)
+     ON CONFLICT (user_id) DO UPDATE SET
+       scorer_team = EXCLUDED.scorer_team,
+       scorer_player = EXCLUDED.scorer_player,
+       updated_at = NOW()`,
+    [userId, scorerTeam || null, scorerPlayer || null]
+  );
+}
+
 export async function saveBonusTip(userId, matchId, bonusPlayer) {
   await pool.query(
     `UPDATE tips SET bonus_player = $3 WHERE user_id = $1 AND match_id = $2`,

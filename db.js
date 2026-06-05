@@ -59,5 +59,20 @@ export async function initDb() {
     ALTER TABLE tips ALTER COLUMN home_score DROP NOT NULL;
     ALTER TABLE tips ALTER COLUMN away_score DROP NOT NULL;
     ALTER TABLE matches ADD COLUMN IF NOT EXISTS czech_scorers TEXT[] NOT NULL DEFAULT '{}';
+
+    CREATE TABLE IF NOT EXISTS tournament_picks (
+      user_id      INTEGER PRIMARY KEY REFERENCES users(id),
+      first_team   TEXT,
+      second_team  TEXT,
+      third_team   TEXT,
+      scorer_team  TEXT,
+      scorer_player TEXT,
+      updated_at   TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+
+    ALTER TABLE tournament_picks ADD COLUMN IF NOT EXISTS scorer_team TEXT;
+    ALTER TABLE tournament_picks ADD COLUMN IF NOT EXISTS scorer_player TEXT;
+    ALTER TABLE tournament_picks ADD COLUMN IF NOT EXISTS assister_team TEXT;
+    ALTER TABLE tournament_picks ADD COLUMN IF NOT EXISTS assister_player TEXT;
   `);
 }
