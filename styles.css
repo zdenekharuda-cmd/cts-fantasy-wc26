@@ -375,6 +375,61 @@ a:hover {
   background: #6c3483;
 }
 
+.bonus-picks-form {
+  margin-top: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  max-width: 500px;
+}
+
+.bonus-pick-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.bonus-place {
+  font-size: 1rem;
+  font-weight: 600;
+  min-width: 110px;
+  white-space: nowrap;
+}
+
+.bonus-place.gold   { color: #b8860b; }
+.bonus-place.silver { color: #708090; }
+.bonus-place.bronze { color: #8b4513; }
+
+.bonus-picks-form select {
+  flex: 1;
+  height: 40px;
+  border: 1px solid #c8e6c9;
+  border-radius: 8px;
+  padding: 0 10px;
+  font-size: 0.95rem;
+  background: white;
+}
+
+.bonus-picks-form select:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.locked-banner {
+  background: #fff3cd;
+  border: 1px solid #ffc107;
+  border-radius: 8px;
+  padding: 10px 16px;
+  margin-bottom: 16px;
+  font-weight: 600;
+  color: #856404;
+}
+
+.other-picks-wrap {
+  margin-top: 8px;
+  overflow-x: auto;
+}
+
 .bonus-tip {
   grid-column: 1 / -1;
   margin-top: 10px;
