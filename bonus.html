@@ -145,10 +145,12 @@
       if (picks?.scorerTeam) {
         scorerTeamSelect.value = picks.scorerTeam;
         updatePlayerSelect(picks.scorerTeam, picks.scorerPlayer ?? '');
+        savedScorerPlayer = picks.scorerPlayer ?? '';
       }
       if (picks?.assisterTeam) {
         assisterTeamSelect.value = picks.assisterTeam;
         updateAssisterPlayerSelect(picks.assisterTeam, picks.assisterPlayer ?? '');
+        savedAssisterPlayer = picks.assisterPlayer ?? '';
       }
     }
 
@@ -205,7 +207,31 @@
       scorerSaveBtn.disabled = locked;
     }
 
-    scorerTeamSelect.addEventListener('change', () => updatePlayerSelect(scorerTeamSelect.value, ''));
+    let savedScorerPlayer = '';
+    let savedAssisterPlayer = '';
+
+    function setDirty(btn, msgEl, isDirty) {
+      if (isDirty) {
+        btn.classList.add('btn-unsaved');
+        btn.textContent = btn.dataset.label + ' ●';
+      } else {
+        btn.classList.remove('btn-unsaved');
+        btn.textContent = btn.dataset.label;
+        msgEl.textContent = '';
+      }
+    }
+
+    scorerSaveBtn.dataset.label = 'Uložit střelce';
+
+    scorerTeamSelect.addEventListener('change', () => {
+      updatePlayerSelect(scorerTeamSelect.value, '');
+      setDirty(scorerSaveBtn, scorerMessage, true);
+    });
+
+    scorerPlayerSelect.addEventListener('change', () => {
+      setDirty(scorerSaveBtn, scorerMessage, scorerPlayerSelect.value !== savedScorerPlayer);
+    });
+
     scorerForm.addEventListener('submit', async (e) => {
       e.preventDefault();
       const scorerTeam = scorerTeamSelect.value;
@@ -216,6 +242,8 @@
       }
       try {
         await api('/api/tournament/scorer', { method: 'POST', body: { scorerTeam, scorerPlayer } });
+        savedScorerPlayer = scorerPlayer;
+        setDirty(scorerSaveBtn, scorerMessage, false);
         setMessage(scorerMessage, `Uloženo: ${scorerPlayer} (${scorerTeam})`, 'success');
         const allPicks = await api('/api/tournament/picks');
         renderOtherPicks(allPicks.picks);
@@ -229,6 +257,8 @@
     const assisterSaveBtn = document.getElementById('assisterSaveBtn');
     const assisterMessage = document.getElementById('assisterMessage');
     const assisterForm = document.getElementById('assisterForm');
+
+    assisterSaveBtn.dataset.label = 'Uložit asistenta';
 
     assisterTeamSelect.innerHTML = `<option value="">— vyber tým —</option>` +
       teamNames.map(t => `<option value="${escapeHtml(t)}">${escapeHtml(t)}</option>`).join('');
@@ -247,7 +277,14 @@
       assisterSaveBtn.disabled = locked;
     }
 
-    assisterTeamSelect.addEventListener('change', () => updateAssisterPlayerSelect(assisterTeamSelect.value, ''));
+    assisterTeamSelect.addEventListener('change', () => {
+      updateAssisterPlayerSelect(assisterTeamSelect.value, '');
+      setDirty(assisterSaveBtn, assisterMessage, true);
+    });
+
+    assisterPlayerSelect.addEventListener('change', () => {
+      setDirty(assisterSaveBtn, assisterMessage, assisterPlayerSelect.value !== savedAssisterPlayer);
+    });
 
     assisterForm.addEventListener('submit', async (e) => {
       e.preventDefault();
@@ -259,6 +296,8 @@
       }
       try {
         await api('/api/tournament/assister', { method: 'POST', body: { assisterTeam, assisterPlayer } });
+        savedAssisterPlayer = assisterPlayer;
+        setDirty(assisterSaveBtn, assisterMessage, false);
         setMessage(assisterMessage, `Uloženo: ${assisterPlayer} (${assisterTeam})`, 'success');
         const allPicks = await api('/api/tournament/picks');
         renderOtherPicks(allPicks.picks);

@@ -415,6 +415,17 @@ a:hover {
   cursor: not-allowed;
 }
 
+.btn-unsaved {
+  background: #e67e22 !important;
+  border-color: #ca6f1e !important;
+  animation: pulse-unsaved 1.5s ease-in-out infinite;
+}
+
+@keyframes pulse-unsaved {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.75; }
+}
+
 .locked-banner {
   background: #fff3cd;
   border: 1px solid #ffc107;
