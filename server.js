@@ -175,6 +175,27 @@ app.get('/api/matches', requireAuth, async (req, res) => {
   });
 });
 
+app.post('/api/tips/batch', requireAuth, async (req, res) => {
+  const entries = Array.isArray(req.body) ? req.body : [];
+  const results = { saved: 0 };
+
+  for (const entry of entries) {
+    const matchId = Number(entry.matchId);
+    const homeScore = normalizeScore(entry.homeScore);
+    const awayScore = normalizeScore(entry.awayScore);
+
+    if (!Number.isInteger(matchId) || homeScore === null || awayScore === null) continue;
+
+    const match = await getMatchById(matchId);
+    if (!match || matchIsTipLocked(match)) continue;
+
+    await upsertTip({ userId: req.session.userId, matchId, homeScore, awayScore });
+    results.saved++;
+  }
+
+  res.json(results);
+});
+
 app.post('/api/tips/:matchId', requireAuth, async (req, res) => {
   const matchId = Number(req.params.matchId);
   const homeScore = normalizeScore(req.body.homeScore);
@@ -238,6 +259,7 @@ app.delete('/api/tips/:matchId/captain', requireAuth, async (req, res) => {
   await removeCaptain(req.session.userId, matchId);
   res.json({ ok: true });
 });
+
 
 app.get('/api/scoreboard', async (req, res) => {
   const [users, matches, tips] = await Promise.all([

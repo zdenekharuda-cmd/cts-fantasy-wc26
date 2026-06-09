@@ -135,6 +135,11 @@
         select.disabled = locked;
       }
       saveBtn.disabled = locked;
+      if (!locked) {
+        const teamsComplete = picks?.firstTeam && picks?.secondTeam && picks?.thirdTeam;
+        saveBtn.dataset.label = saveBtn.dataset.label || 'Uložit tipy';
+        setDirty(saveBtn, message, !teamsComplete);
+      }
       scorerTeamSelect.disabled = locked;
       scorerSaveBtn.disabled = locked;
       if (locked) lockedBanner.style.display = '';
@@ -147,11 +152,14 @@
         updatePlayerSelect(picks.scorerTeam, picks.scorerPlayer ?? '');
         savedScorerPlayer = picks.scorerPlayer ?? '';
       }
+      if (!locked) setDirty(scorerSaveBtn, scorerMessage, !savedScorerPlayer);
+
       if (picks?.assisterTeam) {
         assisterTeamSelect.value = picks.assisterTeam;
         updateAssisterPlayerSelect(picks.assisterTeam, picks.assisterPlayer ?? '');
         savedAssisterPlayer = picks.assisterPlayer ?? '';
       }
+      if (!locked) setDirty(assisterSaveBtn, assisterMessage, !savedAssisterPlayer);
     }
 
     function renderOtherPicks(picks) {

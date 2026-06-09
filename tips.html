@@ -93,6 +93,8 @@
 
       document.querySelectorAll('[data-tip-form]').forEach((form) => {
         form.addEventListener('submit', submitTip);
+        form.querySelector('[name="homeScore"]')?.addEventListener('input', updateSaveAllBar);
+        form.querySelector('[name="awayScore"]')?.addEventListener('input', updateSaveAllBar);
       });
       document.querySelectorAll('[data-captain-btn]').forEach((btn) => {
         btn.addEventListener('click', toggleCaptain);
@@ -100,6 +102,7 @@
       document.querySelectorAll('[data-bonus-save]').forEach((btn) => {
         btn.addEventListener('click', saveBonusTip);
       });
+      updateSaveAllBar();
     }
 
     function matchCard(match, sectionLocked = false) {
@@ -241,14 +244,72 @@
       render();
     }
 
+    const saveAllBtn = document.getElementById('saveAllBtn');
+    const saveAllCount = document.getElementById('saveAllCount');
+
+    function updateSaveAllBar() {
+      const forms = [...document.querySelectorAll('[data-tip-form]')];
+      const pending = forms.filter((form) => {
+        const home = form.querySelector('[name="homeScore"]');
+        const away = form.querySelector('[name="awayScore"]');
+        return home && away && !home.disabled && home.value !== '' && away.value !== '';
+      });
+      if (pending.length > 0) {
+        saveAllCount.textContent = `${pending.length} tip${pending.length >= 5 ? 'ů' : pending.length >= 2 ? 'y' : ''}`;
+        saveAllBtn.style.display = '';
+      } else {
+        saveAllBtn.style.display = 'none';
+      }
+    }
+
+    saveAllBtn.addEventListener('click', async () => {
+      const forms = [...document.querySelectorAll('[data-tip-form]')];
+      const entries = forms
+        .filter((form) => {
+          const home = form.querySelector('[name="homeScore"]');
+          const away = form.querySelector('[name="awayScore"]');
+          return home && away && !home.disabled && home.value !== '' && away.value !== '';
+        })
+        .map((form) => ({
+          matchId: form.dataset.matchId,
+          homeScore: form.querySelector('[name="homeScore"]').value,
+          awayScore: form.querySelector('[name="awayScore"]').value,
+        }));
+
+      if (!entries.length) return;
+
+      saveAllBtn.disabled = true;
+      saveAllBtn.textContent = 'Ukládám...';
+      try {
+        const result = await api('/api/tips/batch', { method: 'POST', body: entries });
+        saveAllBtn.textContent = `✓ Uloženo ${result.saved}`;
+        setTimeout(() => {
+          saveAllBtn.textContent = 'Uložit vše';
+          saveAllBtn.disabled = false;
+        }, 2000);
+        await loadMatches(false);
+      } catch (err) {
+        saveAllBtn.textContent = 'Chyba';
+        setTimeout(() => {
+          saveAllBtn.textContent = 'Uložit vše';
+          saveAllBtn.disabled = false;
+        }, 2000);
+      }
+    });
+
     filterInput.addEventListener('input', render);
 
     await requireLogin();
     await loadMatches();
   </script>
-<div class="bottom-mascot">
-  <img src="/images/zdenek.png" alt="Zdenek" />
-  <span>Good luck!</span>
+<div class="bottom-corner">
+  <button class="save-all-btn" id="saveAllBtn" style="display:none">
+    Uložit vše · <span id="saveAllCount"></span>
+  </button>
+  <div class="bottom-mascot">
+    <img src="/images/zdenek.png" alt="Zdenek" />
+    <span>Good luck!</span>
+  </div>
 </div>
 </body>
 </html>
