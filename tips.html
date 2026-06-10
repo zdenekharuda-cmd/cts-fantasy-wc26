@@ -24,6 +24,10 @@
       </div>
       <input id="filterInput" placeholder="Filtrovat tým, město, kolo...">
     </div>
+    <div id="bonusReminder" class="bonus-reminder" style="display:none">
+      <span>🎯 Nezapomeň vyplnit <a href="/bonus.html">bonusové tipy</a> — týmy, střelec a asistent. Uzamknou se s prvním zápasem!</span>
+      <button class="bonus-reminder-close" id="bonusReminderClose" title="Zavřít">✕</button>
+    </div>
     <div id="matches" class="match-list"></div>
   </main>
   <script type="module">
@@ -300,6 +304,21 @@
     filterInput.addEventListener('input', render);
 
     await requireLogin();
+
+    const bonusReminder = document.getElementById('bonusReminder');
+    document.getElementById('bonusReminderClose').addEventListener('click', () => {
+      bonusReminder.style.display = 'none';
+      sessionStorage.setItem('bonusReminderDismissed', '1');
+    });
+
+    if (!sessionStorage.getItem('bonusReminderDismissed')) {
+      try {
+        const { picks, locked } = await api('/api/tournament/picks/me');
+        const incomplete = !locked && (!picks || !picks.firstTeam || !picks.scorerPlayer || !picks.assisterPlayer);
+        if (incomplete) bonusReminder.style.display = '';
+      } catch {}
+    }
+
     await loadMatches();
   </script>
 <div class="bottom-corner">

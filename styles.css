@@ -415,6 +415,54 @@ a:hover {
   cursor: not-allowed;
 }
 
+.bonus-reminder {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: #fdecea;
+  border: 1px solid #f5c6c2;
+  border-radius: 10px;
+  padding: 10px 14px;
+  margin-bottom: 16px;
+  font-size: 0.9rem;
+  color: #5d4037;
+  line-height: 1.4;
+}
+
+.bonus-reminder span {
+  flex: 1;
+}
+
+.bonus-reminder a {
+  color: #e65100;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.bonus-reminder-close {
+  flex-shrink: 0;
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: none;
+  border: 1px solid #ccc;
+  border-radius: 50%;
+  cursor: pointer;
+  font-size: 0.75rem;
+  color: #999;
+  padding: 0;
+  line-height: 1;
+  outline: none;
+}
+
+.bonus-reminder-close:hover {
+  background: #eee;
+  color: #555;
+  border-color: #aaa;
+}
+
 .bottom-corner {
   position: fixed;
   right: 22px;
