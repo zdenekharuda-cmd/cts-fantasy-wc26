@@ -10,7 +10,8 @@ import {
   getAllUsers, getUserById, getUserByNickname, getUserByEmail, createUser,
   getAllMatches, getMatchById, setMatchResult, resetMatchResult,
   getTipsByUser, getAllTips, upsertTip, setCaptain, removeCaptain, getTipByUserAndMatch, saveBonusTip, setCzechScorers, ensureTipRow,
-  getGroupTeams, getTournamentPicks, getAllTournamentPicks, saveTournamentPicks, saveScorerPick, saveAssisterPick
+  getGroupTeams, getTournamentPicks, getAllTournamentPicks, saveTournamentPicks, saveScorerPick, saveAssisterPick,
+  getTipsByMatch
 } from './store.js';
 import { calculateTipPoints, isMatchFinished } from './scoring.js';
 import { syncOpenFootball } from './syncOpenFootball.js';
@@ -314,6 +315,32 @@ app.post('/api/tips/:matchId/bonus', requireAuth, async (req, res) => {
   const bonusPlayer = String(req.body.bonusPlayer || '').trim() || null;
   await saveBonusTip(req.session.userId, matchId, bonusPlayer);
   res.json({ ok: true });
+});
+
+app.get('/api/matches/:matchId/tips', requireAuth, async (req, res) => {
+  const matchId = Number(req.params.matchId);
+  if (!Number.isInteger(matchId)) return res.status(400).json({ error: 'Invalid match id.' });
+
+  const match = await getMatchById(matchId);
+  if (!match) return res.status(404).json({ error: 'Match not found.' });
+  if (!matchIsTipLocked(match) && !isMatchFinished(match)) {
+    return res.status(403).json({ error: 'Tips are not yet visible.' });
+  }
+
+  const tips = await getTipsByMatch(matchId);
+  const finished = isMatchFinished(match);
+
+  const result = tips.map((tip) => {
+    const base = finished ? calculateTipPoints(tip, match) : null;
+    const points = base !== null ? (tip.isCaptain ? base * 2 : base) : null;
+    return { nickname: tip.nickname, homeScore: tip.homeScore, awayScore: tip.awayScore, isCaptain: tip.isCaptain ?? false, points };
+  });
+
+  if (finished) {
+    result.sort((a, b) => (b.points ?? -1) - (a.points ?? -1) || a.nickname.localeCompare(b.nickname));
+  }
+
+  res.json({ tips: result, finished });
 });
 
 app.get('/api/scoreboard/:userId/tips', async (req, res) => {

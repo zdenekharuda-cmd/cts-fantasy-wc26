@@ -256,6 +256,19 @@ export async function ensureTipRow(userId, matchId) {
   );
 }
 
+export async function getTipsByMatch(matchId) {
+  const { rows } = await pool.query(
+    `SELECT u.nickname, t.home_score AS "homeScore", t.away_score AS "awayScore",
+            t.is_captain AS "isCaptain"
+     FROM tips t
+     JOIN users u ON u.id = t.user_id
+     WHERE t.match_id = $1 AND t.home_score IS NOT NULL AND t.away_score IS NOT NULL
+     ORDER BY u.nickname`,
+    [matchId]
+  );
+  return rows;
+}
+
 export async function getTipByUserAndMatch(userId, matchId) {
   const { rows } = await pool.query(
     `SELECT id FROM tips WHERE user_id = $1 AND match_id = $2`,

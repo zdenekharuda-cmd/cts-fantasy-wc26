@@ -106,6 +106,9 @@
       document.querySelectorAll('[data-bonus-save]').forEach((btn) => {
         btn.addEventListener('click', saveBonusTip);
       });
+      document.querySelectorAll('[data-others-btn]').forEach((btn) => {
+        btn.addEventListener('click', toggleOthers);
+      });
       updateSaveAllBar();
     }
 
@@ -168,6 +171,12 @@
           </div>`;
       })() : '';
 
+      const othersSection = (match.locked || match.finished) ? `
+        <div class="others-section">
+          <button type="button" class="others-btn" data-others-btn data-match-id="${match.id}">Tipy ostatních ▾</button>
+          <div class="others-panel" id="others-panel-${match.id}" hidden></div>
+        </div>` : '';
+
       return `
         <article class="match-card ${match.locked ? 'locked' : ''}">
           <div>
@@ -191,6 +200,7 @@
             <div class="tip-note" id="tip-note-${match.id}">${escapeHtml(tipNote)}</div>
           </form>
           ${bonusPanel}
+          ${othersSection}
         </article>`;
     }
 
@@ -239,6 +249,54 @@
       } catch (error) {
         if (note) setMessage(note, error.message, 'error');
       }
+    }
+
+    async function toggleOthers(event) {
+      const btn = event.currentTarget;
+      const matchId = btn.dataset.matchId;
+      const panel = document.getElementById(`others-panel-${matchId}`);
+
+      if (!panel.hidden) {
+        panel.hidden = true;
+        btn.textContent = 'Tipy ostatních ▾';
+        return;
+      }
+
+      if (!panel.dataset.loaded) {
+        panel.textContent = 'Načítám...';
+        panel.hidden = false;
+        try {
+          const data = await api(`/api/matches/${matchId}/tips`);
+          panel.innerHTML = renderOtherTips(data);
+          panel.dataset.loaded = '1';
+        } catch (err) {
+          panel.textContent = 'Chyba při načítání.';
+        }
+      } else {
+        panel.hidden = false;
+      }
+      btn.textContent = 'Tipy ostatních ▴';
+    }
+
+    function renderOtherTips({ tips, finished }) {
+      if (!tips.length) return '<div class="others-empty">Nikdo jiný zatím netipoval.</div>';
+      const rows = tips.map((t) => {
+        const ptsClass = t.points >= 3 ? 'high' : t.points >= 1 ? 'mid' : 'zero';
+        const ptsCell = finished
+          ? `<td class="others-pts ${ptsClass}">${t.points ?? '–'}</td>`
+          : '';
+        return `<tr>
+          <td>${escapeHtml(t.nickname)}</td>
+          <td class="others-score">${t.homeScore}:${t.awayScore}${t.isCaptain ? ' 👑' : ''}</td>
+          ${ptsCell}
+        </tr>`;
+      }).join('');
+      return `<table class="others-table">
+        <thead><tr>
+          <th>Hráč</th><th>Tip</th>${finished ? '<th>Body</th>' : ''}
+        </tr></thead>
+        <tbody>${rows}</tbody>
+      </table>`;
     }
 
     async function loadMatches(showLoading = true) {
