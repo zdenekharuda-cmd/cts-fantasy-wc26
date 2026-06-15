@@ -53,16 +53,12 @@ function requireAuth(req, res, next) {
   next();
 }
 
-function requireAdmin(req, res, next) {
-  const configuredToken = process.env.ADMIN_TOKEN;
-  const providedToken = req.headers['x-admin-token'];
-
-  if (!configuredToken) {
-    return res.status(403).json({ error: 'ADMIN_TOKEN is not configured on the server.' });
-  }
-  if (providedToken !== configuredToken) {
-    return res.status(403).json({ error: 'Invalid admin token.' });
-  }
+async function requireAdmin(req, res, next) {
+  if (!req.session.userId) return res.status(401).json({ error: 'You need to log in first.' });
+  const adminNickname = process.env.ADMIN_NICKNAME;
+  if (!adminNickname) return res.status(403).json({ error: 'ADMIN_NICKNAME is not configured on the server.' });
+  const user = await getUserById(req.session.userId);
+  if (!user || user.nickname !== adminNickname) return res.status(403).json({ error: 'Přístup odepřen.' });
   next();
 }
 
@@ -450,6 +446,8 @@ app.post('/api/admin/matches/:matchId/scorers', requireAdmin, async (req, res) =
   await setCzechScorers(matchId, scorers);
   res.json({ ok: true, scorers });
 });
+
+app.get('/api/admin/check', requireAdmin, (req, res) => res.json({ ok: true }));
 
 app.post('/api/admin/sync-results', requireAdmin, async (req, res) => {
   const apiKey = process.env.FOOTBALL_DATA_API_KEY;

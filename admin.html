@@ -16,10 +16,7 @@
     <section class="card">
       <h1>Admin</h1>
       <p>Synchronizace zápasů a ruční zadání výsledků.</p>
-      <label for="adminToken">Admin token</label>
-      <input id="adminToken" type="password" placeholder="ADMIN_TOKEN">
       <div class="form-actions">
-        <button id="saveTokenBtn">Uložit token v prohlížeči</button>
         <button id="syncBtn">Synchronizovat zápasy</button>
         <button id="syncResultsBtn">Stáhnout výsledky</button>
       </div>
@@ -43,8 +40,6 @@
       'Adam Hložek','Tomáš Chorý','Mojmír Chytil','Jan Kuchta','Patrik Schick',
     ];
 
-    const tokenInput = document.getElementById('adminToken');
-    const saveTokenBtn = document.getElementById('saveTokenBtn');
     const syncBtn = document.getElementById('syncBtn');
     const syncResultsBtn = document.getElementById('syncResultsBtn');
     const message = document.getElementById('message');
@@ -52,14 +47,8 @@
     const filterInput = document.getElementById('filterInput');
     let matches = [];
 
-    tokenInput.value = localStorage.getItem('ctsAdminToken') || '';
-    saveTokenBtn.addEventListener('click', () => {
-      localStorage.setItem('ctsAdminToken', tokenInput.value);
-      setMessage(message, 'Admin token saved in this browser.', 'success');
-    });
-
     function adminHeaders() {
-      return { 'x-admin-token': tokenInput.value };
+      return {};
     }
 
     syncBtn.addEventListener('click', async () => {
@@ -216,6 +205,12 @@
 
     filterInput.addEventListener('input', render);
     await requireLogin();
+    try {
+      await api('/api/admin/check');
+    } catch {
+      window.location.href = '/login.html';
+      throw new Error('not admin');
+    }
     await loadMatches();
   </script>
 </body>
