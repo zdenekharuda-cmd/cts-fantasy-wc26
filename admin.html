@@ -21,6 +21,7 @@
       <div class="form-actions">
         <button id="saveTokenBtn">Uložit token v prohlížeči</button>
         <button id="syncBtn">Synchronizovat zápasy</button>
+        <button id="syncResultsBtn">Stáhnout výsledky</button>
       </div>
       <div id="message" class="message"></div>
     </section>
@@ -45,6 +46,7 @@
     const tokenInput = document.getElementById('adminToken');
     const saveTokenBtn = document.getElementById('saveTokenBtn');
     const syncBtn = document.getElementById('syncBtn');
+    const syncResultsBtn = document.getElementById('syncResultsBtn');
     const message = document.getElementById('message');
     const list = document.getElementById('matches');
     const filterInput = document.getElementById('filterInput');
@@ -67,6 +69,21 @@
         await loadMatches();
       } catch (error) {
         setMessage(message, error.message, 'error');
+      }
+    });
+
+    syncResultsBtn.addEventListener('click', async () => {
+      syncResultsBtn.disabled = true;
+      syncResultsBtn.textContent = 'Stahuji...';
+      try {
+        const result = await api('/api/admin/sync-results', { method: 'POST', headers: adminHeaders() });
+        setMessage(message, `Staženo: ${result.updated} nových výsledků, ${result.skipped} přeskočeno (z ${result.total} dokončených).`, 'success');
+        await loadMatches(false);
+      } catch (error) {
+        setMessage(message, error.message, 'error');
+      } finally {
+        syncResultsBtn.disabled = false;
+        syncResultsBtn.textContent = 'Stáhnout výsledky';
       }
     });
 

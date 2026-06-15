@@ -15,6 +15,7 @@ import {
 } from './store.js';
 import { calculateTipPoints, isMatchFinished } from './scoring.js';
 import { syncOpenFootball } from './syncOpenFootball.js';
+import { syncResults } from './syncResults.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -448,6 +449,17 @@ app.post('/api/admin/matches/:matchId/scorers', requireAdmin, async (req, res) =
 
   await setCzechScorers(matchId, scorers);
   res.json({ ok: true, scorers });
+});
+
+app.post('/api/admin/sync-results', requireAdmin, async (req, res) => {
+  const apiKey = process.env.FOOTBALL_DATA_API_KEY;
+  if (!apiKey) return res.status(503).json({ error: 'FOOTBALL_DATA_API_KEY není nastavený na serveru.' });
+  try {
+    const result = await syncResults(apiKey);
+    res.json({ ok: true, ...result });
+  } catch (error) {
+    res.status(502).json({ error: error.message });
+  }
 });
 
 app.post('/api/admin/sync', requireAdmin, async (req, res) => {
