@@ -194,7 +194,7 @@
         </div>` : '';
 
       return `
-        <article class="match-card ${match.locked ? 'locked' : ''}" ${hidden ? 'hidden' : ''}>
+        <article class="match-card ${match.locked ? 'locked' : ''}" ${hidden ? 'style="display:none"' : ''}>
           <div>
             <span class="badge ${statusClass}">${escapeHtml(statusLabel)}</span>
             <div class="teams">
