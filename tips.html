@@ -36,7 +36,8 @@
     const list = document.getElementById('matches');
     const filterInput = document.getElementById('filterInput');
     let matches = [];
-    const collapsedSections = new Set();
+    const COLLAPSED_KEY = 'tips_collapsed_sections';
+    const collapsedSections = new Set(JSON.parse(localStorage.getItem(COLLAPSED_KEY) || '[]'));
 
     const CZECH_PLAYERS = {
       'Brankáři':  ['Lukáš Horníček', 'Matěj Kovář', 'Jindřich Staněk'],
@@ -122,6 +123,7 @@
           const section = e.currentTarget.dataset.section;
           if (collapsedSections.has(section)) collapsedSections.delete(section);
           else collapsedSections.add(section);
+          localStorage.setItem(COLLAPSED_KEY, JSON.stringify([...collapsedSections]));
           render();
         });
       });
