@@ -36,6 +36,7 @@
     const list = document.getElementById('matches');
     const filterInput = document.getElementById('filterInput');
     let matches = [];
+    const collapsedSections = new Set();
 
     const CZECH_PLAYERS = {
       'Brankáři':  ['Lukáš Horníček', 'Matěj Kovář', 'Jindřich Staněk'],
@@ -88,12 +89,19 @@
       );
 
       const orderedSections = SECTION_ORDER.filter((s) => sections.has(s));
-      list.innerHTML = orderedSections.map((section) => `
+      list.innerHTML = orderedSections.map((section) => {
+        const collapsed = collapsedSections.has(section);
+        const hasFinished = sections.get(section).some((m) => m.finished);
+        const finishedCount = sections.get(section).filter((m) => m.finished).length;
+        const collapseBtn = hasFinished
+          ? `<button type="button" class="collapse-btn" data-collapse-btn data-section="${escapeHtml(section)}">${collapsed ? `▶ Zobrazit odehrané (${finishedCount})` : '▼ Skrýt odehrané'}</button>`
+          : '';
+        return `
         <section class="round-section">
-          <h2 class="round-heading">${escapeHtml(section)}${lockedSections.has(section) ? ' <span class="round-locked">🔒 kapitán uzamčen</span>' : ''}</h2>
-          ${sections.get(section).map((match) => matchCard(match, lockedSections.has(matchSection(match)))).join('')}
-        </section>
-      `).join('');
+          <h2 class="round-heading">${escapeHtml(section)}${lockedSections.has(section) ? ' <span class="round-locked">🔒 kapitán uzamčen</span>' : ''}${collapseBtn}</h2>
+          ${sections.get(section).map((match) => matchCard(match, lockedSections.has(matchSection(match)), collapsed && match.finished)).join('')}
+        </section>`;
+      }).join('');
 
       document.querySelectorAll('[data-tip-form]').forEach((form) => {
         form.addEventListener('submit', submitTip);
@@ -109,10 +117,18 @@
       document.querySelectorAll('[data-others-btn]').forEach((btn) => {
         btn.addEventListener('click', toggleOthers);
       });
+      document.querySelectorAll('[data-collapse-btn]').forEach((btn) => {
+        btn.addEventListener('click', (e) => {
+          const section = e.currentTarget.dataset.section;
+          if (collapsedSections.has(section)) collapsedSections.delete(section);
+          else collapsedSections.add(section);
+          render();
+        });
+      });
       updateSaveAllBar();
     }
 
-    function matchCard(match, sectionLocked = false) {
+    function matchCard(match, sectionLocked = false, hidden = false) {
       const statusClass = match.finished ? 'finished' : match.locked ? 'locked' : '';
       const statusLabel = match.finished ? `Dokončeno ${match.homeScore}:${match.awayScore}` : match.locked ? 'Uzamčeno' : 'Otevřeno';
       const tip = match.tip || {};
@@ -178,7 +194,7 @@
         </div>` : '';
 
       return `
-        <article class="match-card ${match.locked ? 'locked' : ''}">
+        <article class="match-card ${match.locked ? 'locked' : ''}" ${hidden ? 'hidden' : ''}>
           <div>
             <span class="badge ${statusClass}">${escapeHtml(statusLabel)}</span>
             <div class="teams">
