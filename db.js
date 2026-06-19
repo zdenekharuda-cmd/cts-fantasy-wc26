@@ -74,5 +74,22 @@ export async function initDb() {
     ALTER TABLE tournament_picks ADD COLUMN IF NOT EXISTS scorer_player TEXT;
     ALTER TABLE tournament_picks ADD COLUMN IF NOT EXISTS assister_team TEXT;
     ALTER TABLE tournament_picks ADD COLUMN IF NOT EXISTS assister_player TEXT;
+
+    CREATE TABLE IF NOT EXISTS tournament_stats (
+      singleton INTEGER PRIMARY KEY DEFAULT 1,
+      top_scorer_player TEXT,
+      top_scorer_team TEXT,
+      top_scorer_goals INTEGER,
+      top_assister_player TEXT,
+      top_assister_team TEXT,
+      top_assister_assists INTEGER,
+      updated_at TIMESTAMPTZ
+    );
+    INSERT INTO tournament_stats (singleton) VALUES (1) ON CONFLICT DO NOTHING;
+    ALTER TABLE tournament_stats ADD COLUMN IF NOT EXISTS top_assister_player TEXT;
+    ALTER TABLE tournament_stats ADD COLUMN IF NOT EXISTS top_assister_team TEXT;
+    ALTER TABLE tournament_stats ADD COLUMN IF NOT EXISTS top_assister_assists INTEGER;
+    ALTER TABLE tournament_stats ADD COLUMN IF NOT EXISTS top_assister_players TEXT[] NOT NULL DEFAULT '{}';
+    ALTER TABLE tournament_stats ADD COLUMN IF NOT EXISTS top_scorer_players TEXT[] NOT NULL DEFAULT '{}';
   `);
 }

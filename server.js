@@ -11,7 +11,7 @@ import {
   getAllMatches, getMatchById, setMatchResult, resetMatchResult,
   getTipsByUser, getAllTips, upsertTip, setCaptain, removeCaptain, getTipByUserAndMatch, saveBonusTip, setCzechScorers, ensureTipRow,
   getGroupTeams, getTournamentPicks, getAllTournamentPicks, saveTournamentPicks, saveScorerPick, saveAssisterPick,
-  getTipsByMatch
+  getTipsByMatch, getTopScorer, getTopAssister
 } from './store.js';
 import { calculateTipPoints, isMatchFinished } from './scoring.js';
 import { syncOpenFootball } from './syncOpenFootball.js';
@@ -259,15 +259,22 @@ app.delete('/api/tips/:matchId/captain', requireAuth, async (req, res) => {
 });
 
 
+const SCORER_BONUS_POINTS = 5;
+const ASSISTER_BONUS_POINTS = 5;
+
 app.get('/api/scoreboard', async (req, res) => {
-  const [users, matches, tips] = await Promise.all([
+  const [users, matches, tips, topScorer, topAssister, tournamentPicks] = await Promise.all([
     getAllUsers(),
     getAllMatches(),
-    getAllTips()
+    getAllTips(),
+    getTopScorer(),
+    getTopAssister(),
+    getAllTournamentPicks()
   ]);
 
   const finishedMatches = matches.filter(isMatchFinished);
   const matchById = new Map(matches.map((match) => [Number(match.id), match]));
+  const pickByUser = new Map(tournamentPicks.map((p) => [p.userId, p]));
 
   const rows = users.map((user) => {
     const userTips = tips.filter((tip) => tip.userId === user.id);
@@ -288,7 +295,12 @@ app.get('/api/scoreboard', async (req, res) => {
       }
     }
 
-    return { userId: user.id, name: user.name, nickname: user.nickname, totalPoints, exactScores, scoredTips };
+    const pick = pickByUser.get(user.id);
+    const scorerHit = !!(topScorer && pick?.scorerPlayer && topScorer.players.includes(pick.scorerPlayer));
+    const assisterHit = !!(topAssister && pick?.assisterPlayer && topAssister.players.includes(pick.assisterPlayer));
+    const potentialPoints = (scorerHit ? SCORER_BONUS_POINTS : 0) + (assisterHit ? ASSISTER_BONUS_POINTS : 0);
+
+    return { userId: user.id, name: user.name, nickname: user.nickname, totalPoints, exactScores, scoredTips, potentialPoints, scorerHit, assisterHit };
   });
 
   rows.sort((a, b) => {
@@ -297,7 +309,7 @@ app.get('/api/scoreboard', async (req, res) => {
     return a.nickname.localeCompare(b.nickname);
   });
 
-  res.json({ finishedMatches: finishedMatches.length, users: rows });
+  res.json({ finishedMatches: finishedMatches.length, users: rows, topScorer, topAssister });
 });
 
 app.post('/api/tips/:matchId/bonus', requireAuth, async (req, res) => {

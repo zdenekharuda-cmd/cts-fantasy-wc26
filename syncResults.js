@@ -1,6 +1,8 @@
 import { pool } from './db.js';
+import { setTopScorer } from './store.js';
 
 const API_URL = 'https://api.football-data.org/v4/competitions/2000/matches?status=FINISHED';
+const SCORERS_URL = 'https://api.football-data.org/v4/competitions/2000/scorers?limit=20';
 
 export async function syncResults(apiKey) {
   const response = await fetch(API_URL, {
@@ -38,5 +40,20 @@ export async function syncResults(apiKey) {
     updated++;
   }
 
-  return { updated, skipped, total: finished.length };
+  let topScorer = null;
+  try {
+    const scorersRes = await fetch(SCORERS_URL, { headers: { 'X-Auth-Token': apiKey } });
+    if (scorersRes.ok) {
+      const scorersData = await scorersRes.json();
+      const scorers = scorersData.scorers || [];
+      if (scorers.length) {
+        const maxGoals = scorers[0].goals;
+        const leaders = scorers.filter((s) => s.goals === maxGoals && s.player?.name);
+        topScorer = { players: leaders.map((s) => s.player.name), goals: maxGoals };
+        await setTopScorer(topScorer);
+      }
+    }
+  } catch {}
+
+  return { updated, skipped, total: finished.length, topScorer };
 }

@@ -210,6 +210,48 @@ export async function saveScorerPick(userId, { scorerTeam, scorerPlayer }) {
   );
 }
 
+export async function getTopScorer() {
+  const { rows } = await pool.query(
+    `SELECT top_scorer_players AS "players", top_scorer_goals AS "goals", updated_at AS "updatedAt"
+     FROM tournament_stats WHERE singleton = 1`
+  );
+  const r = rows[0];
+  return (r?.players?.length) ? r : null;
+}
+
+export async function setTopScorer({ players, goals }) {
+  await pool.query(
+    `INSERT INTO tournament_stats (singleton, top_scorer_players, top_scorer_goals, updated_at)
+     VALUES (1, $1, $2, NOW())
+     ON CONFLICT (singleton) DO UPDATE SET
+       top_scorer_players = EXCLUDED.top_scorer_players,
+       top_scorer_goals = EXCLUDED.top_scorer_goals,
+       updated_at = NOW()`,
+    [players, goals]
+  );
+}
+
+export async function getTopAssister() {
+  const { rows } = await pool.query(
+    `SELECT top_assister_players AS "players", top_assister_assists AS "assists", updated_at AS "updatedAt"
+     FROM tournament_stats WHERE singleton = 1`
+  );
+  const r = rows[0];
+  return (r?.players?.length) ? r : null;
+}
+
+export async function setTopAssister({ players, assists }) {
+  await pool.query(
+    `INSERT INTO tournament_stats (singleton, top_assister_players, top_assister_assists, updated_at)
+     VALUES (1, $1, $2, NOW())
+     ON CONFLICT (singleton) DO UPDATE SET
+       top_assister_players = EXCLUDED.top_assister_players,
+       top_assister_assists = EXCLUDED.top_assister_assists,
+       updated_at = NOW()`,
+    [players, assists]
+  );
+}
+
 export async function saveBonusTip(userId, matchId, bonusPlayer) {
   await pool.query(
     `UPDATE tips SET bonus_player = $3 WHERE user_id = $1 AND match_id = $2`,

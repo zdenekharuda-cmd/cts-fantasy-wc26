@@ -22,7 +22,6 @@
           <h1>Scoreboard</h1>
           <p id="summary">Načítám...</p>
         </div>
-        <button id="refreshBtn">Obnovit</button>
       </div>
       <div class="table-wrap">
         <table class="scoreboard-table">
@@ -34,6 +33,7 @@
               <th>Body</th>
               <th>Přesné výsledky</th>
               <th>Vyhodnocených tipů</th>
+              <th title="Body za správný tip na nejlepšího střelce (+5 b) a asistenta (+5 b) turnaje">Potenciální body</th>
             </tr>
           </thead>
           <tbody id="scoreRows"></tbody>
@@ -46,7 +46,6 @@
 
     const rows = document.getElementById('scoreRows');
     const summary = document.getElementById('summary');
-    const refreshBtn = document.getElementById('refreshBtn');
     const openRows = new Set();
 
     const SECTION_ORDER = ['1. kolo skupinové fáze', '2. kolo skupinové fáze', '3. kolo skupinové fáze', 'Vyřazovací fáze'];
@@ -63,12 +62,24 @@
 
     async function load() {
       const data = await api('/api/scoreboard');
-      summary.textContent = `${data.finishedMatches} vyhodnocených zápasů.`;
+      const { topScorer, topAssister } = data;
+      const fmtLeaders = (players) => players.map(escapeHtml).join(', ');
+      const scorerInfo = topScorer ? ` &nbsp;·&nbsp; ⚽ Střelec: <b>${fmtLeaders(topScorer.players)}</b> (${topScorer.goals} gólů)` : '';
+      const assisterInfo = topAssister ? ` &nbsp;·&nbsp; 🎯 Asistent: <b>${fmtLeaders(topAssister.players)}</b> (${topAssister.assists} asistencí)` : '';
+      summary.innerHTML = `${data.finishedMatches} vyhodnocených zápasů.${scorerInfo}${assisterInfo}`;
       if (!data.users.length) {
-        rows.innerHTML = `<tr><td colspan="6" class="muted">Zatím žádní hráči.</td></tr>`;
+        rows.innerHTML = `<tr><td colspan="7" class="muted">Zatím žádní hráči.</td></tr>`;
         return;
       }
-      rows.innerHTML = data.users.map((user, index) => `
+      rows.innerHTML = data.users.map((user, index) => {
+        const badges = [
+          user.scorerHit ? '<span class="pot-badge scorer">⚽ +5</span>' : '',
+          user.assisterHit ? '<span class="pot-badge assister">🎯 +5</span>' : '',
+        ].filter(Boolean).join('');
+        const potCell = badges
+          ? `<td class="potential-cell">${badges}</td>`
+          : `<td class="muted potential-miss">—</td>`;
+        return `
         <tr class="scoreboard-row" data-user-id="${user.userId}" style="cursor:pointer">
           <td class="rank">${index + 1}</td>
           <td><b>${escapeHtml(user.nickname)}</b></td>
@@ -76,13 +87,14 @@
           <td class="points">${user.totalPoints}</td>
           <td>${user.exactScores}</td>
           <td>${user.scoredTips}</td>
+          ${potCell}
         </tr>
         <tr class="detail-row" id="detail-${user.userId}" style="display:none">
-          <td colspan="6" class="detail-cell">
+          <td colspan="7" class="detail-cell">
             <div class="detail-loading">Načítám...</div>
           </td>
-        </tr>
-      `).join('');
+        </tr>`;
+      }).join('');
 
       document.querySelectorAll('.scoreboard-row').forEach((row) => {
         row.addEventListener('click', () => toggleDetail(row.dataset.userId));
@@ -182,7 +194,6 @@
       }
     }
 
-    refreshBtn.addEventListener('click', load);
     await load();
   </script>
 </body>

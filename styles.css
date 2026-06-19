@@ -115,6 +115,11 @@ body {
 
 .rank { font-weight: 700; color: #2d6a2d; width: 32px; }
 .points { font-weight: 700; font-size: 1.05rem; color: #1b5e20; }
+.potential-cell { white-space: nowrap; }
+.potential-miss { text-align: center; }
+.pot-badge { display: inline-block; font-size: 0.8rem; font-weight: 700; padding: 2px 7px; border-radius: 10px; margin-right: 4px; }
+.pot-badge.scorer  { background: #d5f5e3; color: #1e6e3e; }
+.pot-badge.assister { background: #d6eaf8; color: #1a5276; }
 
 .card {
   background: white;
