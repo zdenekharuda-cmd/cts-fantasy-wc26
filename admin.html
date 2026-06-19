@@ -47,6 +47,9 @@
     const filterInput = document.getElementById('filterInput');
     let matches = [];
 
+    const ADMIN_FINISHED_KEY = 'admin_finished_expanded';
+    let finishedExpanded = localStorage.getItem(ADMIN_FINISHED_KEY) === 'true';
+
     function adminHeaders() {
       return {};
     }
@@ -76,20 +79,9 @@
       }
     });
 
-    function render() {
-      const filter = filterInput.value.trim().toLowerCase();
-      const visible = matches.filter((match) => {
-        const text = `${match.teamHome} ${match.teamAway} ${match.venue} ${match.round} ${match.group || ''}`.toLowerCase();
-        return !filter || text.includes(filter);
-      });
-
-      if (!visible.length) {
-        list.innerHTML = `<div class="empty">No matches found.</div>`;
-        return;
-      }
-
-      list.innerHTML = visible.map((match) => `
-        <article class="match-card">
+    function matchCard(match, hidden = false) {
+      return `
+        <article class="match-card" ${hidden ? 'style="display:none"' : ''}>
           <div class="teams">
             <div class="team">${flagSpan(match.homeFlag)} <span>${escapeHtml(match.teamHome)}</span></div>
             <div class="team">${flagSpan(match.awayFlag)} <span>${escapeHtml(match.teamAway)}</span></div>
@@ -127,9 +119,42 @@
             </div>
             <div class="tip-note" id="scorers-note-${match.id}"></div>
           </div>` : ''}
-        </article>
-      `).join('');
+        </article>`;
+    }
 
+    function render() {
+      const filter = filterInput.value.trim().toLowerCase();
+      const visible = matches.filter((match) => {
+        const text = `${match.teamHome} ${match.teamAway} ${match.venue} ${match.round} ${match.group || ''}`.toLowerCase();
+        return !filter || text.includes(filter);
+      });
+
+      if (!visible.length) {
+        list.innerHTML = `<div class="empty">No matches found.</div>`;
+        return;
+      }
+
+      const pending = visible.filter((m) => m.status !== 'FINISHED');
+      const finished = visible.filter((m) => m.status === 'FINISHED');
+      const collapsed = !filter && !finishedExpanded;
+
+      const finishedSection = finished.length ? `
+        <section class="round-section">
+          <h2 class="round-heading">Dokončené zápasy
+            <button type="button" class="collapse-btn" id="finishedCollapseBtn">
+              ${collapsed ? `▶ Zobrazit (${finished.length})` : `▼ Skrýt (${finished.length})`}
+            </button>
+          </h2>
+          ${finished.map((m) => matchCard(m, collapsed)).join('')}
+        </section>` : '';
+
+      list.innerHTML = finishedSection + pending.map((m) => matchCard(m)).join('');
+
+      document.getElementById('finishedCollapseBtn')?.addEventListener('click', () => {
+        finishedExpanded = !finishedExpanded;
+        localStorage.setItem(ADMIN_FINISHED_KEY, finishedExpanded);
+        render();
+      });
       document.querySelectorAll('[data-result-form]').forEach((form) => form.addEventListener('submit', saveResult));
       document.querySelectorAll('[data-unfinish]').forEach((btn) => btn.addEventListener('click', unfinishMatch));
       document.querySelectorAll('[data-add-scorer]').forEach((btn) => btn.addEventListener('click', addScorer));

@@ -356,6 +356,7 @@ app.get('/api/scoreboard/:userId/tips', async (req, res) => {
       const bonusHit = tip.bonusPlayer && Array.isArray(match.czechScorers) && match.czechScorers.includes(tip.bonusPlayer);
       return {
         matchId: match.id,
+        round: match.round,
         kickoffUtc: match.kickoffUtc,
         teamHome: match.teamHome,
         teamAway: match.teamAway,

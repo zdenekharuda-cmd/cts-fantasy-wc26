@@ -49,6 +49,18 @@
     const refreshBtn = document.getElementById('refreshBtn');
     const openRows = new Set();
 
+    const SECTION_ORDER = ['1. kolo skupinové fáze', '2. kolo skupinové fáze', '3. kolo skupinové fáze', 'Vyřazovací fáze'];
+
+    function matchSection(round) {
+      const num = parseInt((round || '').replace('Matchday ', ''), 10);
+      if (!isNaN(num)) {
+        if (num <= 7) return '1. kolo skupinové fáze';
+        if (num <= 13) return '2. kolo skupinové fáze';
+        return '3. kolo skupinové fáze';
+      }
+      return 'Vyřazovací fáze';
+    }
+
     async function load() {
       const data = await api('/api/scoreboard');
       summary.textContent = `${data.finishedMatches} vyhodnocených zápasů.`;
@@ -108,35 +120,63 @@
           cell.innerHTML = `<p class="muted" style="padding:8px 0">Žádné vyhodnocené tipy.</p>`;
           return;
         }
-        cell.innerHTML = `
-          <table class="detail-table">
-            <thead>
+
+        const sections = new Map();
+        for (const tip of data.tips) {
+          const section = matchSection(tip.round);
+          if (!sections.has(section)) sections.set(section, []);
+          sections.get(section).push(tip);
+        }
+
+        const orderedSections = SECTION_ORDER.filter((s) => sections.has(s));
+        const currentSection = orderedSections[orderedSections.length - 1];
+
+        cell.innerHTML = orderedSections.map((section) => {
+          const tips = sections.get(section);
+          const collapsed = section !== currentSection;
+          const sectionPoints = tips.reduce((sum, t) => sum + (t.points ?? 0), 0);
+          const rows = tips.map((t) => {
+            const captainBadge = t.isCaptain ? ' <span class="badge-captain">👑</span>' : '';
+            const bonusBadge = t.bonusPlayer
+              ? ` <span class="badge-bonus ${t.bonusHit ? 'hit' : 'miss'}" title="${escapeHtml(t.bonusPlayer)}">🎯${t.bonusHit ? '+2' : '✗'}</span>`
+              : '';
+            const pointsClass = t.points >= 3 ? 'points-high' : t.points >= 1 ? 'points-mid' : 'points-zero';
+            return `
               <tr>
-                <th>Zápas</th>
-                <th>Datum</th>
-                <th>Výsledek</th>
-                <th>Tip</th>
-                <th>Body</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${data.tips.map((t) => {
-                const captainBadge = t.isCaptain ? ' <span class="badge-captain">👑</span>' : '';
-                const bonusBadge = t.bonusPlayer
-                  ? ` <span class="badge-bonus ${t.bonusHit ? 'hit' : 'miss'}" title="${escapeHtml(t.bonusPlayer)}">🎯${t.bonusHit ? '+2' : '✗'}</span>`
-                  : '';
-                const pointsClass = t.points >= 3 ? 'points-high' : t.points >= 1 ? 'points-mid' : 'points-zero';
-                return `
-                  <tr>
-                    <td>${flagSpan(t.homeFlag)} ${escapeHtml(t.teamHome)} – ${flagSpan(t.awayFlag)} ${escapeHtml(t.teamAway)}</td>
-                    <td class="muted">${escapeHtml(formatKickoff(t.kickoffUtc))}</td>
-                    <td><b>${t.actualHome}:${t.actualAway}</b></td>
-                    <td>${t.tipHome}:${t.tipAway}${captainBadge}${bonusBadge}</td>
-                    <td class="detail-points ${pointsClass}">${t.points}</td>
-                  </tr>`;
-              }).join('')}
-            </tbody>
-          </table>`;
+                <td>${flagSpan(t.homeFlag)} ${escapeHtml(t.teamHome)} – ${flagSpan(t.awayFlag)} ${escapeHtml(t.teamAway)}</td>
+                <td class="muted">${escapeHtml(formatKickoff(t.kickoffUtc))}</td>
+                <td><b>${t.actualHome}:${t.actualAway}</b></td>
+                <td>${t.tipHome}:${t.tipAway}${captainBadge}${bonusBadge}</td>
+                <td class="detail-points ${pointsClass}">${t.points}</td>
+              </tr>`;
+          }).join('');
+          return `
+            <div class="detail-section">
+              <div class="detail-section-header" data-section-toggle="${escapeHtml(section)}">
+                <span class="detail-section-title">${escapeHtml(section)}</span>
+                <span class="detail-section-meta">${tips.length} tip${tips.length >= 5 ? 'ů' : tips.length >= 2 ? 'y' : ''}  ·  ${sectionPoints} b</span>
+                <span class="detail-section-chevron" data-chevron>${collapsed ? '▶' : '▼'}</span>
+              </div>
+              <div class="detail-section-body"${collapsed ? ' style="display:none"' : ''}>
+                <table class="detail-table">
+                  <thead>
+                    <tr><th>Zápas</th><th>Datum</th><th>Výsledek</th><th>Tip</th><th>Body</th></tr>
+                  </thead>
+                  <tbody>${rows}</tbody>
+                </table>
+              </div>
+            </div>`;
+        }).join('');
+
+        cell.querySelectorAll('[data-section-toggle]').forEach((header) => {
+          header.addEventListener('click', () => {
+            const body = header.nextElementSibling;
+            const chevron = header.querySelector('[data-chevron]');
+            const isCollapsed = body.style.display === 'none';
+            body.style.display = isCollapsed ? '' : 'none';
+            chevron.textContent = isCollapsed ? '▼' : '▶';
+          });
+        });
       } catch {
         cell.innerHTML = `<p class="muted" style="padding:8px 0">Chyba při načítání.</p>`;
       }
