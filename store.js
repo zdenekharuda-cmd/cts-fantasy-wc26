@@ -252,6 +252,36 @@ export async function setTopAssister({ players, assists }) {
   );
 }
 
+export async function getBracketOfficial() {
+  const { rows } = await pool.query(
+    `SELECT bracket_official FROM tournament_stats WHERE singleton = 1`
+  );
+  return rows[0]?.bracket_official ?? {};
+}
+
+export async function setBracketOfficial(state) {
+  await pool.query(
+    `UPDATE tournament_stats SET bracket_official = $1 WHERE singleton = 1`,
+    [JSON.stringify(state)]
+  );
+}
+
+export async function getBracketPicks(userId) {
+  const { rows } = await pool.query(
+    `SELECT picks FROM bracket_picks WHERE user_id = $1`, [userId]
+  );
+  return rows[0]?.picks ?? {};
+}
+
+export async function setBracketPicks(userId, picks) {
+  await pool.query(
+    `INSERT INTO bracket_picks (user_id, picks, updated_at)
+     VALUES ($1, $2, NOW())
+     ON CONFLICT (user_id) DO UPDATE SET picks = EXCLUDED.picks, updated_at = NOW()`,
+    [userId, JSON.stringify(picks)]
+  );
+}
+
 export async function saveBonusTip(userId, matchId, bonusPlayer) {
   await pool.query(
     `UPDATE tips SET bonus_player = $3 WHERE user_id = $1 AND match_id = $2`,

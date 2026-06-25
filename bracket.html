@@ -1,0 +1,516 @@
+<!doctype html>
+<html lang="cs">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Pavouk | CTS fantasy WC '26</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flag-icons/css/flag-icons.min.css">
+  <link rel="stylesheet" href="/styles.css">
+  <style>
+    .bracket-page { padding: 16px 0 40px; }
+    .bracket-page h1 { margin-bottom: 4px; }
+    .bracket-hint { font-size: 0.85rem; color: #666; margin-bottom: 16px; }
+
+    .bracket-scroll { overflow-x: auto; padding-bottom: 12px; }
+
+    .bracket-canvas {
+      position: relative;
+      /* width and height set by JS */
+    }
+
+    .b-card {
+      position: absolute;
+      width: 175px;
+      background: #fff;
+      border: 1px solid #b2dfdb;
+      border-radius: 7px;
+      overflow: hidden;
+      box-shadow: 0 1px 4px rgba(0,0,0,.08);
+    }
+
+    .b-card .round-badge {
+      font-size: 0.65rem;
+      text-transform: uppercase;
+      letter-spacing: .04em;
+      color: #888;
+      padding: 3px 8px 0;
+    }
+
+    .b-slot {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 7px 9px;
+      font-size: 0.82rem;
+      cursor: pointer;
+      border: none;
+      background: transparent;
+      width: 100%;
+      text-align: left;
+      transition: background .13s;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      color: #1b4332;
+    }
+    .b-slot:hover:not(:disabled) { background: #e8f5e9; }
+    .b-slot:disabled { cursor: default; }
+    .b-slot + .b-slot { border-top: 1px solid #e8f5e9; }
+
+    .b-slot.winner { background: #c8e6c9; font-weight: 700; }
+    .b-slot.loser  { color: #bbb; text-decoration: line-through; }
+    .b-slot.tbd    { color: #bbb; font-style: italic; cursor: default; }
+
+    .bracket-connector {
+      position: absolute;
+      top: 0; left: 0;
+      pointer-events: none;
+      overflow: visible;
+    }
+
+    .btn-reset {
+      margin-top: 16px;
+      padding: 6px 16px;
+      border: 1px solid #b2dfdb;
+      background: #fff;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 0.85rem;
+      color: #1b4332;
+    }
+    .btn-reset:hover { background: #e8f5e9; }
+
+    .third-place-label {
+      position: absolute;
+      font-size: 0.7rem;
+      color: #888;
+      white-space: nowrap;
+    }
+
+    .b-card.locked { border-color: #81c784; background: #f1f8f1; }
+    .b-card.locked .round-badge { color: #2e7d32; }
+  </style>
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <img src="/images/cts-logo.png" alt="CTS logo">
+      <span>CTS fantasy WC '26</span>
+    </div>
+    <nav class="nav" data-nav></nav>
+  </header>
+  <main class="container">
+    <section class="card card--wide bracket-page">
+      <h1>Pavouk MS 2026 — orientační test!</h1>
+      <p class="bracket-hint">Kliknutím na tým ho posunete do dalšího kola. Stav se ukládá do prohlížeče.</p>
+      <div class="bracket-scroll">
+        <div class="bracket-canvas" id="bracketCanvas">
+          <svg class="bracket-connector" id="connectorSvg"></svg>
+        </div>
+      </div>
+      <button class="btn-reset" id="btnReset">↺ Resetovat pavouka</button>
+    </section>
+  </main>
+  <div class="bottom-corner">
+    <button class="save-all-btn" id="btnSavePicks" style="display:none">Uložit</button>
+  </div>
+  <script src="/common.js" type="module"></script>
+  <script type="module">
+    // ── Bracket definition ────────────────────────────────────────────
+    // R32 order from top to bottom (following the bracket halves):
+    //   Top half → SF 101:  matches 74,77,73,75  (QF97) and 83,84,81,82 (QF98)
+    //   Bottom half → SF102: matches 76,78,79,80 (QF99) and 86,88,85,87 (QF100)
+    //
+    // For each R32 match: top/bottom team name, feedsMatch, feedsSlot
+    // For R16+ match: topFrom (match id), bottomFrom (match id)
+
+    const CARD_H = 82;  // badge ~16px + 2×slot ~30px + divider 1px + borders 2px = ~79px
+    const CARD_W = 175;
+    const GAP    = 18;  // vertical gap between R32 cards
+    const UNIT   = CARD_H + GAP;  // = 100
+
+    const COL_GAP = 52;  // horizontal gap between rounds (for connector lines)
+    const COL_W   = CARD_W + COL_GAP; // = 200
+
+    const ROUNDS_ORDER = ['R32', 'R16', 'QF', 'SF', 'Final'];
+
+    const TEAM_FLAGS = {
+      "Mexico":"mx","South Africa":"za","South Korea":"kr","Czech Republic":"cz",
+      "Canada":"ca","Bosnia & Herzegovina":"ba","Qatar":"qa","Switzerland":"ch",
+      "Brazil":"br","Morocco":"ma","Haiti":"ht","Scotland":"gb-sct",
+      "USA":"us","Paraguay":"py","Australia":"au","Turkey":"tr",
+      "Germany":"de","Curaçao":"cw","Ivory Coast":"ci","Ecuador":"ec",
+      "Netherlands":"nl","Japan":"jp","Sweden":"se","Tunisia":"tn",
+      "Belgium":"be","Egypt":"eg","Iran":"ir","New Zealand":"nz",
+      "Spain":"es","Cape Verde":"cv","Saudi Arabia":"sa","Uruguay":"uy",
+      "France":"fr","Senegal":"sn","Iraq":"iq","Norway":"no",
+      "Argentina":"ar","Algeria":"dz","Austria":"at","Jordan":"jo",
+      "Portugal":"pt","DR Congo":"cd","Uzbekistan":"uz","Colombia":"co",
+      "England":"gb-eng","Croatia":"hr","Ghana":"gh","Panama":"pa"
+    };
+
+    // All 48 WC teams shuffled as placeholder bracket fill
+    // Row order: 74,77,73,75, 83,84,81,82, 76,78,79,80, 86,88,85,87
+    const R32_TEAMS = {
+      74: ['Mexico',       'South Africa'       ],
+      77: ['South Korea',  'Czech Republic'     ],
+      73: ['Canada',       'Bosnia & Herzegovina'],
+      75: ['Qatar',        'Switzerland'        ],
+      83: ['Brazil',       'Morocco'            ],
+      84: ['Haiti',        'Scotland'           ],
+      81: ['USA',          'Paraguay'           ],
+      82: ['Australia',    'Turkey'             ],
+      76: ['Germany',      'Curaçao'            ],
+      78: ['Ivory Coast',  'Ecuador'            ],
+      79: ['Netherlands',  'Japan'              ],
+      80: ['Sweden',       'Tunisia'            ],
+      86: ['Belgium',      'Egypt'              ],
+      88: ['Iran',         'New Zealand'        ],
+      85: ['Spain',        'Cape Verde'         ],
+      87: ['Saudi Arabia', 'Uruguay'            ],
+    };
+
+    // Full bracket match tree
+    // feedsMatch / feedsSlot = where winner goes
+    const MATCHES = {
+      // Round of 32
+      73:  { round: 'R32', topFrom: null, bottomFrom: null, feedsMatch: 90, feedsSlot: 'top'    },
+      74:  { round: 'R32', topFrom: null, bottomFrom: null, feedsMatch: 89, feedsSlot: 'top'    },
+      75:  { round: 'R32', topFrom: null, bottomFrom: null, feedsMatch: 90, feedsSlot: 'bottom' },
+      76:  { round: 'R32', topFrom: null, bottomFrom: null, feedsMatch: 91, feedsSlot: 'top'    },
+      77:  { round: 'R32', topFrom: null, bottomFrom: null, feedsMatch: 89, feedsSlot: 'bottom' },
+      78:  { round: 'R32', topFrom: null, bottomFrom: null, feedsMatch: 91, feedsSlot: 'bottom' },
+      79:  { round: 'R32', topFrom: null, bottomFrom: null, feedsMatch: 92, feedsSlot: 'top'    },
+      80:  { round: 'R32', topFrom: null, bottomFrom: null, feedsMatch: 92, feedsSlot: 'bottom' },
+      81:  { round: 'R32', topFrom: null, bottomFrom: null, feedsMatch: 94, feedsSlot: 'top'    },
+      82:  { round: 'R32', topFrom: null, bottomFrom: null, feedsMatch: 94, feedsSlot: 'bottom' },
+      83:  { round: 'R32', topFrom: null, bottomFrom: null, feedsMatch: 93, feedsSlot: 'top'    },
+      84:  { round: 'R32', topFrom: null, bottomFrom: null, feedsMatch: 93, feedsSlot: 'bottom' },
+      85:  { round: 'R32', topFrom: null, bottomFrom: null, feedsMatch: 96, feedsSlot: 'top'    },
+      86:  { round: 'R32', topFrom: null, bottomFrom: null, feedsMatch: 95, feedsSlot: 'top'    },
+      87:  { round: 'R32', topFrom: null, bottomFrom: null, feedsMatch: 96, feedsSlot: 'bottom' },
+      88:  { round: 'R32', topFrom: null, bottomFrom: null, feedsMatch: 95, feedsSlot: 'bottom' },
+
+      // Round of 16
+      89:  { round: 'R16', topFrom: 74,  bottomFrom: 77,  feedsMatch: 97,  feedsSlot: 'top'    },
+      90:  { round: 'R16', topFrom: 73,  bottomFrom: 75,  feedsMatch: 97,  feedsSlot: 'bottom' },
+      93:  { round: 'R16', topFrom: 83,  bottomFrom: 84,  feedsMatch: 98,  feedsSlot: 'top'    },
+      94:  { round: 'R16', topFrom: 81,  bottomFrom: 82,  feedsMatch: 98,  feedsSlot: 'bottom' },
+      91:  { round: 'R16', topFrom: 76,  bottomFrom: 78,  feedsMatch: 99,  feedsSlot: 'top'    },
+      92:  { round: 'R16', topFrom: 79,  bottomFrom: 80,  feedsMatch: 99,  feedsSlot: 'bottom' },
+      95:  { round: 'R16', topFrom: 86,  bottomFrom: 88,  feedsMatch: 100, feedsSlot: 'top'    },
+      96:  { round: 'R16', topFrom: 85,  bottomFrom: 87,  feedsMatch: 100, feedsSlot: 'bottom' },
+
+      // Quarter-finals
+      97:  { round: 'QF', topFrom: 89,  bottomFrom: 90,  feedsMatch: 101, feedsSlot: 'top'    },
+      98:  { round: 'QF', topFrom: 93,  bottomFrom: 94,  feedsMatch: 101, feedsSlot: 'bottom' },
+      99:  { round: 'QF', topFrom: 91,  bottomFrom: 92,  feedsMatch: 102, feedsSlot: 'top'    },
+      100: { round: 'QF', topFrom: 95,  bottomFrom: 96,  feedsMatch: 102, feedsSlot: 'bottom' },
+
+      // Semi-finals
+      101: { round: 'SF', topFrom: 97,  bottomFrom: 98,  feedsMatch: 104, feedsSlot: 'top',    feedsLoserMatch: 103, feedsLoserSlot: 'top'    },
+      102: { round: 'SF', topFrom: 99,  bottomFrom: 100, feedsMatch: 104, feedsSlot: 'bottom', feedsLoserMatch: 103, feedsLoserSlot: 'bottom' },
+
+      // Final & 3rd place
+      104: { round: 'Final',  topFrom: 101, bottomFrom: 102, feedsMatch: null },
+      103: { round: '3rd',    topFrom: null, bottomFrom: null, feedsMatch: null },  // losers of SF
+    };
+
+    // Bracket row order for R32 (top → bottom)
+    const R32_ORDER = [74, 77, 73, 75,  83, 84, 81, 82,  76, 78, 79, 80,  86, 88, 85, 87];
+    const R16_ORDER = [89, 90, 93, 94,  91, 92, 95, 96];
+    const QF_ORDER  = [97, 98, 99, 100];
+    const SF_ORDER  = [101, 102];
+
+    // ── Position calculation ──────────────────────────────────────────
+    function calcTop(round, index) {
+      // Pattern: round n (R32=0) → top = (2^n - 1) * UNIT/2 + index * 2^n * UNIT
+      // Ensures each card center = midpoint of the two feeder card centers
+      const h = UNIT / 2;
+      switch (round) {
+        case 'R32':   return index * UNIT;
+        case 'R16':   return h       + index * 2  * UNIT;
+        case 'QF':    return 3 * h   + index * 4  * UNIT;
+        case 'SF':    return 7 * h   + index * 8  * UNIT;
+        case 'Final': return 15 * h;
+        case '3rd':   return 15 * h  + CARD_H + 48;
+        default:      return 0;
+      }
+    }
+
+    function colX(round) {
+      const idx = { R32: 0, R16: 1, QF: 2, SF: 3, Final: 4, '3rd': 4 }[round];
+      return idx * COL_W;
+    }
+
+    // ── State management ─────────────────────────────────────────────
+    const STATE_KEY = 'bracket2026';
+
+    function loadState() {
+      try { return JSON.parse(localStorage.getItem(STATE_KEY)) || {}; }
+      catch { return {}; }
+    }
+
+    function saveState(s) {
+      localStorage.setItem(STATE_KEY, JSON.stringify(s));
+    }
+
+    let state = loadState();
+    let officialState = {};  // loaded from server, locks decided matches
+
+    // Resolve team name for a slot: walk up the tree following winners
+    function resolveTeam(matchId, slot) {
+      const m = MATCHES[matchId];
+      const fromId = m[slot + 'From']; // topFrom / bottomFrom
+
+      if (fromId === null) {
+        // R32 — return hardcoded placeholder
+        if (m.round === 'R32') {
+          return (R32_TEAMS[matchId] || [])[slot === 'top' ? 0 : 1] || '?';
+        }
+        // 3rd place losers
+        if (m.round === '3rd') {
+          const sfId = slot === 'top' ? 101 : 102;
+          const sfState = officialState[sfId] ?? state[sfId];
+          if (!sfState?.winner) return null;
+          const loserTeamSlot = sfState.winner === 'top' ? 'bottom' : 'top';
+          return resolveTeam(sfId, loserTeamSlot);
+        }
+        return null;
+      }
+
+      const feederState = officialState[fromId] ?? state[fromId];
+      if (!feederState?.winner) return null;  // TBD
+      return resolveTeam(fromId, feederState.winner);
+    }
+
+    // ── Rendering ────────────────────────────────────────────────────
+    const ROUND_LABELS = { R32: 'Osm. finále', R16: 'Osm. finále', QF: 'Čtvrtfinále', SF: 'Semifinále', Final: 'Finále', '3rd': 'O 3. místo' };
+
+    function render() {
+      const canvas = document.getElementById('bracketCanvas');
+      const svg    = document.getElementById('connectorSvg');
+
+      // Remove old cards (keep svg)
+      canvas.querySelectorAll('.b-card, .third-place-label').forEach(el => el.remove());
+      svg.innerHTML = '';
+
+      const allOrdered = [
+        ...R32_ORDER.map(id => ({ id, round: 'R32' })),
+        ...R16_ORDER.map(id => ({ id, round: 'R16' })),
+        ...QF_ORDER .map(id => ({ id, round: 'QF'  })),
+        ...SF_ORDER .map(id => ({ id, round: 'SF'  })),
+        { id: 104, round: 'Final' },
+        { id: 103, round: '3rd'   },
+      ];
+
+      const positions = {};  // matchId → { x, y }
+
+      allOrdered.forEach(({ id, round }, globalIdx) => {
+        const roundIdx = {
+          R32:   R32_ORDER.indexOf(id),
+          R16:   R16_ORDER.indexOf(id),
+          QF:    QF_ORDER.indexOf(id),
+          SF:    SF_ORDER.indexOf(id),
+          Final: 0,
+          '3rd': 0,
+        }[round];
+
+        const x = colX(round);
+        const y = calcTop(round, roundIdx);
+        positions[id] = { x, y };
+
+        const topTeam    = resolveTeam(id, 'top');
+        const bottomTeam = resolveTeam(id, 'bottom');
+        const locked     = isMatchLocked(id);
+        const matchState = officialState[id] ?? state[id];
+        const winner     = matchState?.winner;
+
+        const card = document.createElement('div');
+        card.className = 'b-card';
+        card.style.left = x + 'px';
+        card.style.top  = y + 'px';
+        card.dataset.matchId = id;
+
+        if (locked) card.classList.add('locked');
+
+        const badge = document.createElement('div');
+        badge.className = 'round-badge';
+        badge.textContent = (locked ? '🔒 ' : '') + (ROUND_LABELS[round] || round);
+        card.appendChild(badge);
+
+        ['top', 'bottom'].forEach(slot => {
+          const team = slot === 'top' ? topTeam : bottomTeam;
+          const btn  = document.createElement('button');
+          btn.className = 'b-slot';
+          btn.dataset.slot = slot;
+
+          if (!team) {
+            btn.textContent = '–';
+            btn.classList.add('tbd');
+            btn.disabled = true;
+          } else {
+            const flagCode = TEAM_FLAGS[team];
+            if (flagCode) {
+              const flag = document.createElement('span');
+              flag.className = `fi fi-${flagCode}`;
+              btn.appendChild(flag);
+            }
+            btn.appendChild(document.createTextNode(' ' + team));
+            if (winner === slot)      btn.classList.add('winner');
+            else if (winner && winner !== slot) btn.classList.add('loser');
+
+            const m = MATCHES[id];
+            const canClick = !locked;
+            if (!canClick) btn.disabled = true;
+
+            if (!locked) btn.addEventListener('click', () => handleClick(id, slot));
+          }
+
+          card.appendChild(btn);
+        });
+
+        canvas.appendChild(card);
+      });
+
+      // Draw connector lines
+      const lines = [];
+      const midXOffset = COL_GAP / 2;  // midpoint between two rounds
+
+      Object.entries(positions).forEach(([idStr, { x, y }]) => {
+        const id = +idStr;
+        const m  = MATCHES[id];
+        const centerY = y + CARD_H / 2;
+
+        ['top', 'bottom'].forEach(slot => {
+          const fromId = m[slot + 'From'];
+          if (!fromId || !positions[fromId]) return;
+
+          const from = positions[fromId];
+          const fromCenterY = from.y + CARD_H / 2;
+          const midX = from.x + CARD_W + midXOffset;
+
+          lines.push(`
+            <line x1="${from.x + CARD_W}" y1="${fromCenterY}" x2="${midX}" y2="${fromCenterY}" />
+            <line x1="${midX}" y1="${fromCenterY}" x2="${midX}" y2="${centerY}" />
+            <line x1="${midX}" y1="${centerY}" x2="${x}" y2="${centerY}" />
+          `);
+        });
+      });
+
+      svg.innerHTML = `<g stroke="#a5d6a7" stroke-width="1.5" fill="none">${lines.join('')}</g>`;
+
+      // Set canvas size
+      const maxX = colX('Final') + CARD_W + 20;
+      const maxY = calcTop('3rd', 0) + CARD_H + 30;
+      canvas.style.width  = maxX + 'px';
+      canvas.style.height = maxY + 'px';
+      svg.setAttribute('width',  maxX);
+      svg.setAttribute('height', maxY);
+    }
+
+    function isMatchLocked(matchId) {
+      return !!officialState[matchId]?.winner;
+    }
+
+    // Merge official state into user state: official wins override user picks
+    // and propagate through the bracket
+    function mergedState(matchId) {
+      return officialState[matchId] ?? state[matchId];
+    }
+
+    function handleClick(matchId, slot) {
+      if (isMatchLocked(matchId)) return;  // admin already decided
+      const m = MATCHES[matchId];
+      const team = resolveTeam(matchId, slot);
+      if (!team) return;
+
+      const prev = state[matchId]?.winner;
+      if (prev === slot) {
+        clearDownstream(matchId);
+        delete state[matchId];
+      } else {
+        clearDownstream(matchId);
+        state[matchId] = { winner: slot };
+      }
+
+      saveState(state);
+      markDirty();
+      render();
+    }
+
+    function clearDownstream(matchId) {
+      const m = MATCHES[matchId];
+      if (!m) return;
+
+      if (m.feedsMatch) {
+        delete state[m.feedsMatch];
+        clearDownstream(m.feedsMatch);
+      }
+
+      // 3rd place — losers of SF
+      if (matchId === 101 || matchId === 102) {
+        delete state[103];
+      }
+    }
+
+    document.getElementById('btnReset').addEventListener('click', () => {
+      if (!confirm('Resetovat celý pavouk?')) return;
+      state = {};
+      saveState(state);
+      render();
+    });
+
+    // ── Save picks (logged-in users only) ────────────────────────────
+    let loggedIn = false;
+    const saveBtn = document.getElementById('btnSavePicks');
+
+    function markDirty() {
+      if (!loggedIn) return;
+      saveBtn.style.display = '';
+      saveBtn.textContent = 'Uložit';
+      saveBtn.disabled = false;
+    }
+
+    saveBtn.addEventListener('click', async () => {
+      saveBtn.disabled = true;
+      saveBtn.textContent = 'Ukládám...';
+      try {
+        await fetch('/api/bracket/picks', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify(state)
+        }).then(r => { if (!r.ok) throw new Error(); });
+        saveState(state);
+        saveBtn.textContent = '✓ Uloženo';
+        setTimeout(() => { saveBtn.style.display = 'none'; }, 1500);
+      } catch {
+        saveBtn.textContent = 'Chyba!';
+        saveBtn.disabled = false;
+      }
+    });
+
+    // ── Init: load official state + user picks ────────────────────────
+    const [officialData, meData] = await Promise.allSettled([
+      fetch('/api/bracket').then(r => r.json()),
+      fetch('/api/me').then(r => r.json()),
+    ]);
+
+    officialState = officialData.status === 'fulfilled' ? (officialData.value || {}) : {};
+
+    if (meData.status === 'fulfilled' && meData.value?.user) {
+      loggedIn = true;
+      // Load picks from DB; fall back to localStorage
+      try {
+        const dbPicks = await fetch('/api/bracket/picks').then(r => r.json());
+        if (dbPicks && Object.keys(dbPicks).length > 0) {
+          state = dbPicks;
+          saveState(state);
+        }
+      } catch {}
+    }
+
+    render();
+  </script>
+</body>
+</html>

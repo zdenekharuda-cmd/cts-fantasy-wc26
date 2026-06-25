@@ -23,8 +23,8 @@ export async function renderNav() {
   if (!nav) return;
   const { user } = await api('/api/me');
   nav.innerHTML = user
-    ? `<a href="/tips.html">Tipy</a><a href="/bonus.html">Bonusové tipy</a><a href="/scoreboard.html">Žebříček</a><a href="/bodovani.html">Bodování</a><span>${escapeHtml(user.nickname)}</span><button id="logoutBtn">Odhlásit</button>`
-    : `<a href="/login.html">Přihlášení</a><a href="/register.html">Registrace</a><a href="/bonus.html">Bonusové tipy</a><a href="/scoreboard.html">Žebříček</a><a href="/bodovani.html">Bodování</a>`;
+    ? `<a href="/tips.html">Tipy</a><a href="/bonus.html">Bonusové tipy</a><a href="/scoreboard.html">Žebříček</a><a href="/bracket.html">Pavouk</a><a href="/bodovani.html">Bodování</a><span>${escapeHtml(user.nickname)}</span><button id="logoutBtn">Odhlásit</button>`
+    : `<a href="/login.html">Přihlášení</a><a href="/register.html">Registrace</a><a href="/bonus.html">Bonusové tipy</a><a href="/scoreboard.html">Žebříček</a><a href="/bracket.html">Pavouk</a><a href="/bodovani.html">Bodování</a>`;
 
   const logoutBtn = document.getElementById('logoutBtn');
   if (logoutBtn) {

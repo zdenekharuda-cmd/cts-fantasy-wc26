@@ -6,6 +6,34 @@
   <title>Admin | CTS fantasy WC '26</title>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flag-icons/css/flag-icons.min.css">
   <link rel="stylesheet" href="/styles.css">
+  <style>
+    .bracket-canvas { position: relative; }
+    .bracket-connector { position: absolute; top: 0; left: 0; pointer-events: none; overflow: visible; }
+    .b-card {
+      position: absolute; background: #fff;
+      border: 1px solid #b2dfdb; border-radius: 7px; overflow: hidden;
+      box-shadow: 0 1px 4px rgba(0,0,0,.08);
+    }
+    .b-card.locked { border-color: #81c784; background: #f1f8f1; }
+    .b-card .round-badge {
+      font-size: 0.65rem; text-transform: uppercase; letter-spacing: .04em;
+      color: #888; padding: 3px 8px 0;
+    }
+    .b-card.locked .round-badge { color: #2e7d32; }
+    .b-slot {
+      display: flex; align-items: center; gap: 6px;
+      padding: 7px 9px; font-size: 0.82rem; cursor: pointer;
+      border: none; background: transparent; width: 100%; text-align: left;
+      transition: background .13s; white-space: nowrap; overflow: hidden;
+      text-overflow: ellipsis; color: #1b4332;
+    }
+    .b-slot:hover:not(:disabled) { background: #e8f5e9; }
+    .b-slot:disabled { cursor: default; }
+    .b-slot + .b-slot { border-top: 1px solid #e8f5e9; }
+    .b-slot.winner { background: #c8e6c9; font-weight: 700; }
+    .b-slot.loser  { color: #bbb; text-decoration: line-through; }
+    .b-slot.tbd    { color: #bbb; font-style: italic; cursor: default; }
+  </style>
 </head>
 <body>
   <header class="topbar">
@@ -29,7 +57,25 @@
       </div>
       <div id="matches" class="match-list"></div>
     </section>
+    <section class="card card--wide" style="margin-top:18px;">
+      <div class="toolbar">
+        <div>
+          <h2>Pavouk — oficiální výsledky</h2>
+          <p style="margin:2px 0 0;font-size:0.85rem;color:#666;">Kliknutím na tým nastavíte oficiálního postupujícího. Zamkne daný zápas uživatelům.</p>
+        </div>
+      </div>
+      <div id="bracketMsg" style="margin-bottom:8px;font-size:0.85rem;"></div>
+      <div style="overflow-x:auto;padding-bottom:12px;">
+        <div class="bracket-canvas" id="adminBracketCanvas">
+          <svg class="bracket-connector" id="adminConnectorSvg"></svg>
+        </div>
+      </div>
+      <button id="btnResetBracket" style="margin-top:8px;padding:5px 14px;border:1px solid #b2dfdb;background:#fff;border-radius:6px;cursor:pointer;font-size:0.85rem;color:#c62828;">↺ Resetovat pavouka</button>
+    </section>
   </main>
+  <div class="bottom-corner">
+    <button class="save-all-btn" id="btnSaveBracket" style="display:none">Uložit</button>
+  </div>
   <script type="module">
     import { api, escapeHtml, flagSpan, formatKickoff, requireLogin, setMessage } from '/common.js';
 
@@ -237,6 +283,255 @@
       throw new Error('not admin');
     }
     await loadMatches();
+
+    // ── Admin bracket ─────────────────────────────────────────────────
+    {
+      const TEAM_FLAGS = {
+        "Mexico":"mx","South Africa":"za","South Korea":"kr","Czech Republic":"cz",
+        "Canada":"ca","Bosnia & Herzegovina":"ba","Qatar":"qa","Switzerland":"ch",
+        "Brazil":"br","Morocco":"ma","Haiti":"ht","Scotland":"gb-sct",
+        "USA":"us","Paraguay":"py","Australia":"au","Turkey":"tr",
+        "Germany":"de","Curaçao":"cw","Ivory Coast":"ci","Ecuador":"ec",
+        "Netherlands":"nl","Japan":"jp","Sweden":"se","Tunisia":"tn",
+        "Belgium":"be","Egypt":"eg","Iran":"ir","New Zealand":"nz",
+        "Spain":"es","Cape Verde":"cv","Saudi Arabia":"sa","Uruguay":"uy",
+        "France":"fr","Senegal":"sn","Iraq":"iq","Norway":"no",
+        "Argentina":"ar","Algeria":"dz","Austria":"at","Jordan":"jo",
+        "Portugal":"pt","DR Congo":"cd","Uzbekistan":"uz","Colombia":"co",
+        "England":"gb-eng","Croatia":"hr","Ghana":"gh","Panama":"pa"
+      };
+
+      const CARD_H = 82, CARD_W = 175, GAP = 18, UNIT = CARD_H + GAP;
+      const COL_GAP = 52, COL_W = CARD_W + COL_GAP;
+
+      const R32_TEAMS = {
+        74:['Mexico','South Africa'],       77:['South Korea','Czech Republic'],
+        73:['Canada','Bosnia & Herzegovina'],75:['Qatar','Switzerland'],
+        83:['Brazil','Morocco'],            84:['Haiti','Scotland'],
+        81:['USA','Paraguay'],              82:['Australia','Turkey'],
+        76:['Germany','Curaçao'],           78:['Ivory Coast','Ecuador'],
+        79:['Netherlands','Japan'],         80:['Sweden','Tunisia'],
+        86:['Belgium','Egypt'],             88:['Iran','New Zealand'],
+        85:['Spain','Cape Verde'],          87:['Saudi Arabia','Uruguay'],
+      };
+
+      const MATCHES = {
+        73:{round:'R32',topFrom:null,bottomFrom:null,feedsMatch:90,feedsSlot:'top'},
+        74:{round:'R32',topFrom:null,bottomFrom:null,feedsMatch:89,feedsSlot:'top'},
+        75:{round:'R32',topFrom:null,bottomFrom:null,feedsMatch:90,feedsSlot:'bottom'},
+        76:{round:'R32',topFrom:null,bottomFrom:null,feedsMatch:91,feedsSlot:'top'},
+        77:{round:'R32',topFrom:null,bottomFrom:null,feedsMatch:89,feedsSlot:'bottom'},
+        78:{round:'R32',topFrom:null,bottomFrom:null,feedsMatch:91,feedsSlot:'bottom'},
+        79:{round:'R32',topFrom:null,bottomFrom:null,feedsMatch:92,feedsSlot:'top'},
+        80:{round:'R32',topFrom:null,bottomFrom:null,feedsMatch:92,feedsSlot:'bottom'},
+        81:{round:'R32',topFrom:null,bottomFrom:null,feedsMatch:94,feedsSlot:'top'},
+        82:{round:'R32',topFrom:null,bottomFrom:null,feedsMatch:94,feedsSlot:'bottom'},
+        83:{round:'R32',topFrom:null,bottomFrom:null,feedsMatch:93,feedsSlot:'top'},
+        84:{round:'R32',topFrom:null,bottomFrom:null,feedsMatch:93,feedsSlot:'bottom'},
+        85:{round:'R32',topFrom:null,bottomFrom:null,feedsMatch:96,feedsSlot:'top'},
+        86:{round:'R32',topFrom:null,bottomFrom:null,feedsMatch:95,feedsSlot:'top'},
+        87:{round:'R32',topFrom:null,bottomFrom:null,feedsMatch:96,feedsSlot:'bottom'},
+        88:{round:'R32',topFrom:null,bottomFrom:null,feedsMatch:95,feedsSlot:'bottom'},
+        89:{round:'R16',topFrom:74,bottomFrom:77,feedsMatch:97,feedsSlot:'top'},
+        90:{round:'R16',topFrom:73,bottomFrom:75,feedsMatch:97,feedsSlot:'bottom'},
+        91:{round:'R16',topFrom:76,bottomFrom:78,feedsMatch:99,feedsSlot:'top'},
+        92:{round:'R16',topFrom:79,bottomFrom:80,feedsMatch:99,feedsSlot:'bottom'},
+        93:{round:'R16',topFrom:83,bottomFrom:84,feedsMatch:98,feedsSlot:'top'},
+        94:{round:'R16',topFrom:81,bottomFrom:82,feedsMatch:98,feedsSlot:'bottom'},
+        95:{round:'R16',topFrom:86,bottomFrom:88,feedsMatch:100,feedsSlot:'top'},
+        96:{round:'R16',topFrom:85,bottomFrom:87,feedsMatch:100,feedsSlot:'bottom'},
+        97:{round:'QF',topFrom:89,bottomFrom:90,feedsMatch:101,feedsSlot:'top'},
+        98:{round:'QF',topFrom:93,bottomFrom:94,feedsMatch:101,feedsSlot:'bottom'},
+        99:{round:'QF',topFrom:91,bottomFrom:92,feedsMatch:102,feedsSlot:'top'},
+        100:{round:'QF',topFrom:95,bottomFrom:96,feedsMatch:102,feedsSlot:'bottom'},
+        101:{round:'SF',topFrom:97,bottomFrom:98,feedsMatch:104,feedsSlot:'top',feedsLoserMatch:103,feedsLoserSlot:'top'},
+        102:{round:'SF',topFrom:99,bottomFrom:100,feedsMatch:104,feedsSlot:'bottom',feedsLoserMatch:103,feedsLoserSlot:'bottom'},
+        104:{round:'Final',topFrom:101,bottomFrom:102,feedsMatch:null},
+        103:{round:'3rd',topFrom:null,bottomFrom:null,feedsMatch:null},
+      };
+
+      const R32_ORDER = [74,77,73,75,83,84,81,82,76,78,79,80,86,88,85,87];
+      const R16_ORDER = [89,90,93,94,91,92,95,96];
+      const QF_ORDER  = [97,98,99,100];
+      const SF_ORDER  = [101,102];
+      const ROUND_LABELS = {R32:'Osm. finále',R16:'Osm. finále',QF:'Čtvrtfinále',SF:'Semifinále',Final:'Finále','3rd':'O 3. místo'};
+
+      function colX(round) {
+        return {R32:0,R16:1,QF:2,SF:3,Final:4,'3rd':4}[round] * COL_W;
+      }
+      function calcTop(round, index) {
+        const h = UNIT / 2;
+        switch(round) {
+          case 'R32':   return index * UNIT;
+          case 'R16':   return h       + index * 2 * UNIT;
+          case 'QF':    return 3*h     + index * 4 * UNIT;
+          case 'SF':    return 7*h     + index * 8 * UNIT;
+          case 'Final': return 15*h;
+          case '3rd':   return 15*h + CARD_H + 48;
+          default:      return 0;
+        }
+      }
+
+      let bState = {};
+
+      function resolveTeam(matchId, slot) {
+        const m = MATCHES[matchId];
+        const fromId = m[slot + 'From'];
+        if (fromId === null) {
+          if (m.round === 'R32') return (R32_TEAMS[matchId] || [])[slot === 'top' ? 0 : 1] || '?';
+          if (m.round === '3rd') {
+            const sfId = slot === 'top' ? 101 : 102;
+            const sfState = bState[sfId];
+            if (!sfState?.winner) return null;
+            return resolveTeam(sfId, sfState.winner === 'top' ? 'bottom' : 'top');
+          }
+          return null;
+        }
+        const feeder = bState[fromId];
+        if (!feeder?.winner) return null;
+        return resolveTeam(fromId, feeder.winner);
+      }
+
+      function clearDownstream(matchId) {
+        const m = MATCHES[matchId];
+        if (!m) return;
+        if (m.feedsMatch) { delete bState[m.feedsMatch]; clearDownstream(m.feedsMatch); }
+        if (matchId === 101 || matchId === 102) delete bState[103];
+      }
+
+      function renderBracket() {
+        const canvas = document.getElementById('adminBracketCanvas');
+        const svg    = document.getElementById('adminConnectorSvg');
+        canvas.querySelectorAll('.b-card').forEach(el => el.remove());
+        svg.innerHTML = '';
+
+        const allOrdered = [
+          ...R32_ORDER.map(id => ({id,round:'R32'})),
+          ...R16_ORDER.map(id => ({id,round:'R16'})),
+          ...QF_ORDER .map(id => ({id,round:'QF'})),
+          ...SF_ORDER .map(id => ({id,round:'SF'})),
+          {id:104,round:'Final'}, {id:103,round:'3rd'},
+        ];
+
+        const positions = {};
+        allOrdered.forEach(({id, round}) => {
+          const idx = {R32:R32_ORDER,R16:R16_ORDER,QF:QF_ORDER,SF:SF_ORDER,Final:[104],'3rd':[103]}[round].indexOf(id);
+          const x = colX(round), y = calcTop(round, idx);
+          positions[id] = {x, y};
+
+          const topTeam = resolveTeam(id, 'top');
+          const bottomTeam = resolveTeam(id, 'bottom');
+          const winner = bState[id]?.winner;
+
+          const card = document.createElement('div');
+          card.className = 'b-card' + (winner ? ' locked' : '');
+          card.style.cssText = `left:${x}px;top:${y}px;width:${CARD_W}px;`;
+
+          const badge = document.createElement('div');
+          badge.className = 'round-badge';
+          badge.textContent = (winner ? '✓ ' : '') + (ROUND_LABELS[round] || round);
+          card.appendChild(badge);
+
+          ['top','bottom'].forEach(slot => {
+            const team = slot === 'top' ? topTeam : bottomTeam;
+            const btn = document.createElement('button');
+            btn.className = 'b-slot';
+            if (!team) {
+              btn.textContent = '–'; btn.classList.add('tbd'); btn.disabled = true;
+            } else {
+              const flagCode = TEAM_FLAGS[team];
+              if (flagCode) { const f = document.createElement('span'); f.className = `fi fi-${flagCode}`; btn.appendChild(f); }
+              btn.appendChild(document.createTextNode(' ' + team));
+              if (winner === slot) btn.classList.add('winner');
+              else if (winner) btn.classList.add('loser');
+              btn.addEventListener('click', () => {
+                const prev = bState[id]?.winner;
+                if (prev === slot) { clearDownstream(id); delete bState[id]; }
+                else { clearDownstream(id); bState[id] = {winner: slot}; }
+                renderBracket();
+              });
+            }
+            card.appendChild(btn);
+          });
+          canvas.appendChild(card);
+        });
+
+        const lines = [];
+        Object.entries(positions).forEach(([idStr, {x, y}]) => {
+          const id = +idStr, m = MATCHES[id];
+          const midXOff = COL_GAP / 2;
+          ['top','bottom'].forEach(slot => {
+            const fromId = m[slot + 'From'];
+            if (!fromId || !positions[fromId]) return;
+            const from = positions[fromId];
+            const fromCY = from.y + CARD_H/2, toCY = y + CARD_H/2;
+            const midX = from.x + CARD_W + midXOff;
+            lines.push(`<line x1="${from.x+CARD_W}" y1="${fromCY}" x2="${midX}" y2="${fromCY}"/>
+                        <line x1="${midX}" y1="${fromCY}" x2="${midX}" y2="${toCY}"/>
+                        <line x1="${midX}" y1="${toCY}" x2="${x}" y2="${toCY}"/>`);
+          });
+        });
+        svg.innerHTML = `<g stroke="#a5d6a7" stroke-width="1.5" fill="none">${lines.join('')}</g>`;
+
+        const maxX = colX('Final') + CARD_W + 20;
+        const maxY = calcTop('3rd', 0) + CARD_H + 30;
+        canvas.style.cssText = `position:relative;width:${maxX}px;height:${maxY}px;`;
+        svg.setAttribute('width', maxX); svg.setAttribute('height', maxY);
+      }
+
+      const saveBtn = document.getElementById('btnSaveBracket');
+      const bracketMsg = document.getElementById('bracketMsg');
+
+      function markDirty() {
+        saveBtn.style.display = '';
+        saveBtn.textContent = 'Uložit';
+        saveBtn.disabled = false;
+      }
+
+      // Patch renderBracket to show save button on any click
+      const _origClick = renderBracket;
+      const origRender = renderBracket;
+
+      saveBtn.addEventListener('click', async () => {
+        saveBtn.disabled = true;
+        saveBtn.textContent = 'Ukládám...';
+        try {
+          await api('/api/admin/bracket', {method:'POST', headers: adminHeaders(), body: bState});
+          saveBtn.textContent = '✓ Uloženo';
+          setTimeout(() => { saveBtn.style.display = 'none'; }, 1500);
+        } catch(e) {
+          saveBtn.textContent = 'Chyba!';
+          saveBtn.disabled = false;
+          bracketMsg.style.color = '#c62828';
+          bracketMsg.textContent = 'Chyba: ' + e.message;
+          setTimeout(() => { bracketMsg.textContent = ''; }, 3000);
+        }
+      });
+
+      document.getElementById('btnResetBracket').addEventListener('click', () => {
+        if (!confirm('Resetovat celý pavouk?')) return;
+        bState = {};
+        markDirty();
+        renderBracket();
+      });
+
+      // Wrap bracket click handler to show save button
+      const _renderBracket = renderBracket;
+      renderBracket = function() {
+        _renderBracket();
+        // re-wire all bracket slot clicks to also call markDirty
+        document.querySelectorAll('#adminBracketCanvas .b-slot:not(.tbd)').forEach(btn => {
+          const orig = btn.onclick;
+          btn.addEventListener('click', markDirty, {once: false});
+        });
+      };
+
+      // Load existing official state
+      try {
+        bState = await api('/api/admin/bracket') || {};
+      } catch { bState = {}; }
+      renderBracket();
+    }
   </script>
 </body>
 </html>

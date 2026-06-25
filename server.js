@@ -11,7 +11,9 @@ import {
   getAllMatches, getMatchById, setMatchResult, resetMatchResult,
   getTipsByUser, getAllTips, upsertTip, setCaptain, removeCaptain, getTipByUserAndMatch, saveBonusTip, setCzechScorers, ensureTipRow,
   getGroupTeams, getTournamentPicks, getAllTournamentPicks, saveTournamentPicks, saveScorerPick, saveAssisterPick,
-  getTipsByMatch, getTopScorer, getTopAssister
+  getTipsByMatch, getTopScorer, getTopAssister,
+  getBracketOfficial, setBracketOfficial,
+  getBracketPicks, setBracketPicks
 } from './store.js';
 import { calculateTipPoints, isMatchFinished } from './scoring.js';
 import { syncOpenFootball } from './syncOpenFootball.js';
@@ -458,6 +460,36 @@ app.post('/api/admin/matches/:matchId/scorers', requireAdmin, async (req, res) =
 
   await setCzechScorers(matchId, scorers);
   res.json({ ok: true, scorers });
+});
+
+app.get('/api/bracket', async (req, res) => {
+  res.json(await getBracketOfficial());
+});
+
+app.get('/api/bracket/picks', requireAuth, async (req, res) => {
+  res.json(await getBracketPicks(req.session.userId));
+});
+
+app.post('/api/bracket/picks', requireAuth, async (req, res) => {
+  const picks = req.body;
+  if (typeof picks !== 'object' || Array.isArray(picks)) {
+    return res.status(400).json({ error: 'Invalid picks.' });
+  }
+  await setBracketPicks(req.session.userId, picks);
+  res.json({ ok: true });
+});
+
+app.get('/api/admin/bracket', requireAdmin, async (req, res) => {
+  res.json(await getBracketOfficial());
+});
+
+app.post('/api/admin/bracket', requireAdmin, async (req, res) => {
+  const state = req.body;
+  if (typeof state !== 'object' || Array.isArray(state)) {
+    return res.status(400).json({ error: 'Invalid bracket state.' });
+  }
+  await setBracketOfficial(state);
+  res.json({ ok: true });
 });
 
 app.get('/api/admin/check', requireAdmin, (req, res) => res.json({ ok: true }));
