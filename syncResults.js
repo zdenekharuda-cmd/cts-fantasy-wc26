@@ -4,6 +4,19 @@ import { setTopScorer } from './store.js';
 const API_URL = 'https://api.football-data.org/v4/competitions/2000/matches?status=FINISHED';
 const SCORERS_URL = 'https://api.football-data.org/v4/competitions/2000/scorers?limit=20';
 
+// Normalize team names to handle API vs DB naming differences
+const TEAM_NAME_MAP = {
+  'Bosnia-Herzegovina': 'Bosnia & Herzegovina',
+  'Cape Verde Islands': 'Cape Verde',
+  'Congo DR': 'DR Congo',
+  'Czechia': 'Czech Republic',
+  'United States': 'USA',
+};
+
+function normalizeName(name) {
+  return TEAM_NAME_MAP[name] ?? name;
+}
+
 export async function syncResults(apiKey) {
   const response = await fetch(API_URL, {
     headers: { 'X-Auth-Token': apiKey }
@@ -22,20 +35,27 @@ export async function syncResults(apiKey) {
 
   for (const apiMatch of finished) {
     const { rows } = await pool.query(
-      `SELECT id, status FROM matches
+      `SELECT id, status, team_home, team_away FROM matches
        WHERE ABS(EXTRACT(EPOCH FROM (kickoff_utc - $1::timestamptz))) < 120`,
       [apiMatch.utcDate]
     );
 
-    if (rows.length === 0 || rows[0].status === 'FINISHED') {
-      skipped++;
-      continue;
-    }
+    if (rows.length === 0) { skipped++; continue; }
+
+    const apiHome = normalizeName(apiMatch.homeTeam?.name ?? '');
+    const apiAway = normalizeName(apiMatch.awayTeam?.name ?? '');
+
+    // When multiple matches start at the same time, pick by team names
+    const match = rows.length === 1
+      ? rows[0]
+      : rows.find((r) => r.team_home === apiHome && r.team_away === apiAway);
+
+    if (!match || match.status === 'FINISHED') { skipped++; continue; }
 
     await pool.query(
       `UPDATE matches SET home_score = $2, away_score = $3, status = 'FINISHED', result_updated_at = NOW()
        WHERE id = $1`,
-      [rows[0].id, apiMatch.score.fullTime.home, apiMatch.score.fullTime.away]
+      [match.id, apiMatch.score.fullTime.home, apiMatch.score.fullTime.away]
     );
     updated++;
   }
