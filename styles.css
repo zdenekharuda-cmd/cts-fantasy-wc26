@@ -114,6 +114,9 @@ body {
 .badge-bonus.miss { background: #fdecea; color: #c0392b; }
 
 .rank { font-weight: 700; color: #2d6a2d; width: 32px; }
+.rank-delta { font-size: 0.7em; font-weight: 600; margin-left: 3px; padding: 1px 4px; border-radius: 4px; vertical-align: middle; }
+.delta-up { background: #d4edda; color: #1a6632; }
+.delta-down { background: #f8d7da; color: #721c24; }
 .points { font-weight: 700; font-size: 1.05rem; color: #1b5e20; }
 .potential-cell { white-space: nowrap; }
 .potential-miss { text-align: center; }

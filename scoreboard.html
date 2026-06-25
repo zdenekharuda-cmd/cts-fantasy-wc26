@@ -81,7 +81,7 @@
           : `<td class="muted potential-miss">—</td>`;
         return `
         <tr class="scoreboard-row" data-user-id="${user.userId}" style="cursor:pointer">
-          <td class="rank">${index + 1}</td>
+          <td class="rank">${index + 1}${user.rankDelta != null && user.rankDelta !== 0 ? `<span class="rank-delta ${user.rankDelta > 0 ? 'delta-up' : 'delta-down'}">${user.rankDelta > 0 ? '+' : ''}${user.rankDelta}</span>` : ''}</td>
           <td><b>${escapeHtml(user.nickname)}</b></td>
           <td>${escapeHtml(user.name)}</td>
           <td class="points">${user.totalPoints}</td>

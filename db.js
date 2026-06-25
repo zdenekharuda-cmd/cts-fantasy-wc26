@@ -92,6 +92,8 @@ export async function initDb() {
     ALTER TABLE tournament_stats ADD COLUMN IF NOT EXISTS top_assister_players TEXT[] NOT NULL DEFAULT '{}';
     ALTER TABLE tournament_stats ADD COLUMN IF NOT EXISTS top_scorer_players TEXT[] NOT NULL DEFAULT '{}';
     ALTER TABLE tournament_stats ADD COLUMN IF NOT EXISTS bracket_official JSONB NOT NULL DEFAULT '{}';
+    ALTER TABLE tournament_stats ADD COLUMN IF NOT EXISTS scoreboard_snapshot JSONB NOT NULL DEFAULT '{}';
+    ALTER TABLE tournament_stats ADD COLUMN IF NOT EXISTS scoreboard_delta JSONB NOT NULL DEFAULT '{}';
 
     CREATE TABLE IF NOT EXISTS bracket_picks (
       user_id    INTEGER PRIMARY KEY REFERENCES users(id),

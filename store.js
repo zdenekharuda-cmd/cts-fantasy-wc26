@@ -252,6 +252,34 @@ export async function setTopAssister({ players, assists }) {
   );
 }
 
+export async function getScoreboardSnapshot() {
+  const { rows } = await pool.query(
+    `SELECT scoreboard_snapshot AS snapshot, updated_at FROM tournament_stats WHERE singleton = 1`
+  );
+  return rows[0]?.snapshot ?? {};
+}
+
+export async function saveScoreboardSnapshot(snapshot) {
+  await pool.query(
+    `UPDATE tournament_stats SET scoreboard_snapshot = $1, updated_at = NOW() WHERE singleton = 1`,
+    [JSON.stringify(snapshot)]
+  );
+}
+
+export async function getScoreboardDelta() {
+  const { rows } = await pool.query(
+    `SELECT scoreboard_delta AS delta FROM tournament_stats WHERE singleton = 1`
+  );
+  return rows[0]?.delta ?? {};
+}
+
+export async function saveScoreboardDelta(delta) {
+  await pool.query(
+    `UPDATE tournament_stats SET scoreboard_delta = $1 WHERE singleton = 1`,
+    [JSON.stringify(delta)]
+  );
+}
+
 export async function getBracketOfficial() {
   const { rows } = await pool.query(
     `SELECT bracket_official FROM tournament_stats WHERE singleton = 1`

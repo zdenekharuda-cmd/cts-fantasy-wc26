@@ -13,7 +13,9 @@ import {
   getGroupTeams, getTournamentPicks, getAllTournamentPicks, saveTournamentPicks, saveScorerPick, saveAssisterPick,
   getTipsByMatch, getTopScorer, getTopAssister,
   getBracketOfficial, setBracketOfficial,
-  getBracketPicks, setBracketPicks
+  getBracketPicks, setBracketPicks,
+  getScoreboardSnapshot, saveScoreboardSnapshot,
+  getScoreboardDelta, saveScoreboardDelta
 } from './store.js';
 import { calculateTipPoints, isMatchFinished } from './scoring.js';
 import { syncOpenFootball } from './syncOpenFootball.js';
@@ -265,13 +267,14 @@ const SCORER_BONUS_POINTS = 5;
 const ASSISTER_BONUS_POINTS = 5;
 
 app.get('/api/scoreboard', async (req, res) => {
-  const [users, matches, tips, topScorer, topAssister, tournamentPicks] = await Promise.all([
+  const [users, matches, tips, topScorer, topAssister, tournamentPicks, delta] = await Promise.all([
     getAllUsers(),
     getAllMatches(),
     getAllTips(),
     getTopScorer(),
     getTopAssister(),
-    getAllTournamentPicks()
+    getAllTournamentPicks(),
+    getScoreboardDelta()
   ]);
 
   const finishedMatches = matches.filter(isMatchFinished);
@@ -302,7 +305,8 @@ app.get('/api/scoreboard', async (req, res) => {
     const assisterHit = !!(topAssister && pick?.assisterPlayer && topAssister.players.includes(pick.assisterPlayer));
     const potentialPoints = (scorerHit ? SCORER_BONUS_POINTS : 0) + (assisterHit ? ASSISTER_BONUS_POINTS : 0);
 
-    return { userId: user.id, name: user.name, nickname: user.nickname, totalPoints, exactScores, scoredTips, potentialPoints, scorerHit, assisterHit };
+    const rankDelta = delta[user.id] ?? null;
+    return { userId: user.id, name: user.name, nickname: user.nickname, totalPoints, exactScores, scoredTips, potentialPoints, scorerHit, assisterHit, rankDelta };
   });
 
   rows.sort((a, b) => {
@@ -490,6 +494,52 @@ app.post('/api/admin/bracket', requireAdmin, async (req, res) => {
   }
   await setBracketOfficial(state);
   res.json({ ok: true });
+});
+
+// Helper: compute current sorted ranking [ { userId, totalPoints, exactScores, nickname } ]
+async function computeRanking() {
+  const [users, matches, tips, topScorer, topAssister, tournamentPicks] = await Promise.all([
+    getAllUsers(), getAllMatches(), getAllTips(), getTopScorer(), getTopAssister(), getAllTournamentPicks()
+  ]);
+  const finishedMatches = matches.filter(isMatchFinished);
+  const matchById = new Map(matches.map(m => [Number(m.id), m]));
+  const pickByUser = new Map(tournamentPicks.map(p => [p.userId, p]));
+
+  return users.map(user => {
+    const userTips = tips.filter(t => t.userId === user.id);
+    let totalPoints = 0, exactScores = 0;
+    for (const tip of userTips) {
+      const match = matchById.get(Number(tip.matchId));
+      if (!match || !isMatchFinished(match)) continue;
+      const base = calculateTipPoints(tip, match) ?? 0;
+      const points = tip.isCaptain ? base * 2 : base;
+      totalPoints += points;
+      if (base === 3) exactScores++;
+      if (tip.bonusPlayer && Array.isArray(match.czechScorers) && match.czechScorers.includes(tip.bonusPlayer)) totalPoints += 2;
+    }
+    return { userId: user.id, nickname: user.nickname, totalPoints, exactScores };
+  }).sort((a, b) => b.totalPoints - a.totalPoints || b.exactScores - a.exactScores || a.nickname.localeCompare(b.nickname));
+}
+
+app.post('/api/admin/snapshot', requireAdmin, async (req, res) => {
+  const ranking = await computeRanking();
+  const snapshot = {};
+  ranking.forEach((row, i) => { snapshot[row.userId] = i + 1; });
+  await saveScoreboardSnapshot(snapshot);
+  res.json({ ok: true, snapshot });
+});
+
+app.post('/api/admin/evaluate-delta', requireAdmin, async (req, res) => {
+  const [ranking, snapshot] = await Promise.all([computeRanking(), getScoreboardSnapshot()]);
+  if (!Object.keys(snapshot).length) return res.status(400).json({ error: 'Nejprve ulož snapshot.' });
+  const delta = {};
+  ranking.forEach((row, i) => {
+    const currentRank = i + 1;
+    const snapshotRank = snapshot[row.userId];
+    delta[row.userId] = snapshotRank != null ? snapshotRank - currentRank : 0;
+  });
+  await saveScoreboardDelta(delta);
+  res.json({ ok: true, delta });
 });
 
 app.get('/api/admin/check', requireAdmin, (req, res) => res.json({ ok: true }));

@@ -47,6 +47,8 @@
       <div class="form-actions">
         <button id="syncBtn">Synchronizovat zápasy</button>
         <button id="syncResultsBtn">Stáhnout výsledky</button>
+        <button id="snapshotBtn">📸 Uložit snapshot</button>
+        <button id="evaluateBtn">📊 Vyhodnotit +/-</button>
       </div>
       <div id="message" class="message"></div>
     </section>
@@ -122,6 +124,33 @@
       } finally {
         syncResultsBtn.disabled = false;
         syncResultsBtn.textContent = 'Stáhnout výsledky';
+      }
+    });
+
+    const snapshotBtn = document.getElementById('snapshotBtn');
+    const evaluateBtn = document.getElementById('evaluateBtn');
+
+    snapshotBtn.addEventListener('click', async () => {
+      snapshotBtn.disabled = true;
+      try {
+        await api('/api/admin/snapshot', { method: 'POST', headers: adminHeaders() });
+        setMessage(message, 'Snapshot uložen.', 'success');
+      } catch (error) {
+        setMessage(message, error.message, 'error');
+      } finally {
+        snapshotBtn.disabled = false;
+      }
+    });
+
+    evaluateBtn.addEventListener('click', async () => {
+      evaluateBtn.disabled = true;
+      try {
+        const result = await api('/api/admin/evaluate-delta', { method: 'POST', headers: adminHeaders() });
+        setMessage(message, `+/- vyhodnoceno pro ${result.count} uživatelů.`, 'success');
+      } catch (error) {
+        setMessage(message, error.message, 'error');
+      } finally {
+        evaluateBtn.disabled = false;
       }
     });
 
