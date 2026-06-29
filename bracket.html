@@ -101,8 +101,8 @@
   </header>
   <main class="container">
     <section class="card card--wide bracket-page">
-      <h1>Pavouk MS 2026 — orientační test!</h1>
-      <p class="bracket-hint">Kliknutím na tým ho posunete do dalšího kola.<br>Pavouk bude před prvním zápasem Brazílie celý uzamčen.</p>
+      <h1 id="bracketTitle">Pavouk MS 2026</h1>
+      <p class="bracket-hint" id="bracketHint">Kliknutím na tým ho posunete do dalšího kola.<br>Pavouk bude před prvním zápasem Brazílie celý uzamčen.</p>
       <div class="bracket-scroll">
         <div class="bracket-canvas" id="bracketCanvas">
           <svg class="bracket-connector" id="connectorSvg"></svg>
@@ -422,7 +422,7 @@
     }
 
     function handleClick(matchId, slot) {
-      if (isMatchLocked(matchId)) return;  // admin already decided
+      if (viewMode || isMatchLocked(matchId)) return;
       const m = MATCHES[matchId];
       const team = resolveTeam(matchId, slot);
       if (!team) return;
@@ -463,12 +463,16 @@
       render();
     });
 
+    // ── View mode (zobrazení cizího pavouka) ─────────────────────────
+    const viewUserId = new URLSearchParams(window.location.search).get('userId');
+    let viewMode = !!viewUserId;
+
     // ── Save picks (logged-in users only) ────────────────────────────
     let loggedIn = false;
     const saveBtn = document.getElementById('btnSavePicks');
 
     function markDirty() {
-      if (!loggedIn) return;
+      if (!loggedIn || viewMode) return;
       saveBtn.style.display = '';
       saveBtn.textContent = 'Uložit';
       saveBtn.disabled = false;
@@ -500,9 +504,22 @@
 
     officialState = officialData.status === 'fulfilled' ? (officialData.value || {}) : {};
 
-    if (meData.status === 'fulfilled' && meData.value?.user) {
+    if (viewMode) {
+      // Zobrazení pavouka jiného uživatele — pouze pro čtení
+      try {
+        const picks = await fetch(`/api/bracket/picks/${viewUserId}`).then(r => r.json());
+        if (picks && Object.keys(picks).length > 0) state = picks;
+      } catch {}
+      document.getElementById('bracketHint').style.display = 'none';
+      document.getElementById('btnReset').style.display = 'none';
+      // Načteme přezdívku z API scoreboard pro název
+      try {
+        const sb = await fetch('/api/scoreboard').then(r => r.json());
+        const user = sb.users?.find(u => String(u.userId) === String(viewUserId));
+        if (user) document.getElementById('bracketTitle').textContent = `Pavouk — ${user.nickname}`;
+      } catch {}
+    } else if (meData.status === 'fulfilled' && meData.value?.user) {
       loggedIn = true;
-      // Load picks from DB; fall back to localStorage
       try {
         const dbPicks = await fetch('/api/bracket/picks').then(r => r.json());
         if (dbPicks && Object.keys(dbPicks).length > 0) {
