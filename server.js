@@ -482,6 +482,12 @@ app.get('/api/bracket/picks', requireAuth, async (req, res) => {
   res.json(await getBracketPicks(req.session.userId));
 });
 
+app.get('/api/bracket/picks/:userId', async (req, res) => {
+  const userId = Number(req.params.userId);
+  if (!Number.isInteger(userId)) return res.status(400).json({ error: 'Invalid user id.' });
+  res.json(await getBracketPicks(userId));
+});
+
 app.post('/api/bracket/picks', requireAuth, async (req, res) => {
   const picks = req.body;
   if (typeof picks !== 'object' || Array.isArray(picks)) {

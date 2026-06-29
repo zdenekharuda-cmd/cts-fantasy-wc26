@@ -89,9 +89,12 @@
 
     .b-card.locked { border-color: #81c784; background: #f1f8f1; }
     .b-card.locked .round-badge { color: #2e7d32; }
+    body.in-iframe .topbar { display: none; }
+    body.in-iframe .container { padding-top: 0; }
   </style>
 </head>
 <body>
+  <script>if (window.self !== window.top) document.body.classList.add('in-iframe');</script>
   <header class="topbar">
     <div class="brand">
       <img src="/images/cts-logo.png" alt="CTS logo">
@@ -437,7 +440,7 @@
       }
 
       saveState(state);
-      markDirty();
+      autoSave();
       render();
     }
 
@@ -467,34 +470,37 @@
     const viewUserId = new URLSearchParams(window.location.search).get('userId');
     let viewMode = !!viewUserId;
 
-    // ── Save picks (logged-in users only) ────────────────────────────
+    // ── Autosave ──────────────────────────────────────────────────────
     let loggedIn = false;
     const saveBtn = document.getElementById('btnSavePicks');
+    saveBtn.style.display = 'none';
 
-    function markDirty() {
-      if (!loggedIn || viewMode) return;
+    let saveStatusTimeout;
+    function showSaveStatus(text, color = '#2e7d32') {
       saveBtn.style.display = '';
-      saveBtn.textContent = 'Uložit';
-      saveBtn.disabled = false;
+      saveBtn.style.background = 'none';
+      saveBtn.style.border = 'none';
+      saveBtn.style.color = color;
+      saveBtn.style.cursor = 'default';
+      saveBtn.textContent = text;
+      clearTimeout(saveStatusTimeout);
+      saveStatusTimeout = setTimeout(() => { saveBtn.style.display = 'none'; }, 1800);
     }
 
-    saveBtn.addEventListener('click', async () => {
-      saveBtn.disabled = true;
-      saveBtn.textContent = 'Ukládám...';
+    async function autoSave() {
+      if (!loggedIn || viewMode) return;
+      showSaveStatus('Ukládám…', '#888');
       try {
         await fetch('/api/bracket/picks', {
           method: 'POST',
           headers: { 'content-type': 'application/json' },
           body: JSON.stringify(state)
         }).then(r => { if (!r.ok) throw new Error(); });
-        saveState(state);
-        saveBtn.textContent = '✓ Uloženo';
-        setTimeout(() => { saveBtn.style.display = 'none'; }, 1500);
+        showSaveStatus('✓ Uloženo');
       } catch {
-        saveBtn.textContent = 'Chyba!';
-        saveBtn.disabled = false;
+        showSaveStatus('✗ Chyba uložení', '#c62828');
       }
-    });
+    }
 
     // ── Init: load official state + user picks ────────────────────────
     const [officialData, meData] = await Promise.allSettled([
@@ -506,6 +512,7 @@
 
     if (viewMode) {
       // Zobrazení pavouka jiného uživatele — pouze pro čtení
+      state = {};  // ignoruj vlastní localStorage
       try {
         const picks = await fetch(`/api/bracket/picks/${viewUserId}`).then(r => r.json());
         if (picks && Object.keys(picks).length > 0) state = picks;

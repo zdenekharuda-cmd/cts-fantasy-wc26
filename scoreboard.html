@@ -6,8 +6,27 @@
   <title>Scoreboard | CTS fantasy WC '26</title>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flag-icons/css/flag-icons.min.css">
   <link rel="stylesheet" href="/styles.css">
+  <style>
+    .bracket-modal { display:none; position:fixed; inset:0; background:rgba(0,0,0,.45); z-index:1000; align-items:center; justify-content:center; }
+    .bracket-modal.open { display:flex; }
+    .bracket-modal-box { background:#fff; border-radius:10px; width:96vw; max-width:1100px; height:90vh; display:flex; flex-direction:column; overflow:hidden; box-shadow:0 8px 32px rgba(0,0,0,.25); }
+    .bracket-modal-header { display:flex; align-items:center; justify-content:space-between; padding:10px 16px; border-bottom:1px solid #e8f5e9; flex-shrink:0; }
+    .bracket-modal-header span { font-weight:700; color:#1b4332; }
+    .bracket-modal-close { border:none; background:none; font-size:1.4rem; cursor:pointer; color:#555; line-height:1; }
+    .bracket-modal-close:hover { color:#c62828; }
+    .bracket-modal iframe { flex:1; border:none; width:100%; }
+  </style>
 </head>
 <body>
+  <div class="bracket-modal" id="bracketModal">
+    <div class="bracket-modal-box">
+      <div class="bracket-modal-header">
+        <span id="bracketModalTitle">Pavouk</span>
+        <button class="bracket-modal-close" id="bracketModalClose">✕</button>
+      </div>
+      <iframe id="bracketModalFrame" src="" title="Pavouk"></iframe>
+    </div>
+  </div>
   <header class="topbar">
     <div class="brand">
       <img src="/images/cts-logo.png" alt="CTS logo">
@@ -34,6 +53,7 @@
               <th>Přesné výsledky</th>
               <th>Vyhodnocených tipů</th>
               <th title="Body za správný tip na nejlepšího střelce (+5 b) a asistenta (+5 b) turnaje">Potenciální body</th>
+              <th></th>
             </tr>
           </thead>
           <tbody id="scoreRows"></tbody>
@@ -88,9 +108,10 @@
           <td>${user.exactScores}</td>
           <td>${user.scoredTips}</td>
           ${potCell}
+          <td><button class="btn-bracket" data-bracket-btn data-user-id="${user.userId}" data-nickname="${escapeHtml(user.nickname)}">🕸 Pavouk</button></td>
         </tr>
         <tr class="detail-row" id="detail-${user.userId}" style="display:none">
-          <td colspan="7" class="detail-cell">
+          <td colspan="8" class="detail-cell">
             <div class="detail-loading">Načítám...</div>
           </td>
         </tr>`;
@@ -193,6 +214,36 @@
         cell.innerHTML = `<p class="muted" style="padding:8px 0">Chyba při načítání.</p>`;
       }
     }
+
+    // ── Bracket modal ─────────────────────────────────────────────────
+    const modal      = document.getElementById('bracketModal');
+    const modalFrame = document.getElementById('bracketModalFrame');
+    const modalTitle = document.getElementById('bracketModalTitle');
+    const modalClose = document.getElementById('bracketModalClose');
+
+    function openBracketModal(userId, nickname) {
+      modalTitle.textContent = `Pavouk — ${nickname}`;
+      modalFrame.src = `/bracket.html?userId=${userId}`;
+      modal.classList.add('open');
+      document.body.style.overflow = 'hidden';
+    }
+
+    function closeBracketModal() {
+      modal.classList.remove('open');
+      modalFrame.src = '';
+      document.body.style.overflow = '';
+    }
+
+    modalClose.addEventListener('click', closeBracketModal);
+    modal.addEventListener('click', (e) => { if (e.target === modal) closeBracketModal(); });
+    document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeBracketModal(); });
+
+    document.addEventListener('click', (e) => {
+      const btn = e.target.closest('[data-bracket-btn]');
+      if (!btn) return;
+      e.stopPropagation();
+      openBracketModal(btn.dataset.userId, btn.dataset.nickname);
+    });
 
     await load();
   </script>
