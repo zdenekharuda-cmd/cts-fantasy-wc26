@@ -80,7 +80,15 @@ function matchSectionKey(round) {
     if (num <= 13) return '2';
     return '3';
   }
-  return 'knockout';
+  switch (round) {
+    case 'Round of 32':          return 'r32';
+    case 'Round of 16':          return 'r16';
+    case 'Quarter-final':        return 'qf';
+    case 'Semi-final':           return 'sf';
+    case 'Final':
+    case 'Match for third place': return 'final';
+    default:                     return 'knockout';
+  }
 }
 
 function matchIsTipLocked(match, now = Date.now()) {

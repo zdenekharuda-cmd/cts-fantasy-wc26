@@ -37,7 +37,12 @@
     const filterInput = document.getElementById('filterInput');
     let matches = [];
     const COLLAPSED_KEY = 'tips_collapsed_sections';
-    const collapsedSections = new Set(JSON.parse(localStorage.getItem(COLLAPSED_KEY) || '[]'));
+    const GROUP_SECTIONS = ['1. kolo skupinové fáze', '2. kolo skupinové fáze', '3. kolo skupinové fáze'];
+    const collapsedSections = new Set(
+      localStorage.getItem(COLLAPSED_KEY)
+        ? JSON.parse(localStorage.getItem(COLLAPSED_KEY))
+        : GROUP_SECTIONS
+    );
 
     const CZECH_PLAYERS = {
       'Brankáři':  ['Lukáš Horníček', 'Matěj Kovář', 'Jindřich Staněk'],
@@ -57,10 +62,21 @@
         if (num <= 13) return '2. kolo skupinové fáze';
         return '3. kolo skupinové fáze';
       }
-      return 'Vyřazovací fáze';
+      switch (match.round) {
+        case 'Round of 32':           return 'Kolo 32';
+        case 'Round of 16':           return 'Osmifinále';
+        case 'Quarter-final':         return 'Čtvrtfinále';
+        case 'Semi-final':            return 'Semifinále';
+        case 'Final':
+        case 'Match for third place': return 'Finále';
+        default:                      return 'Vyřazovací fáze';
+      }
     }
 
-    const SECTION_ORDER = ['1. kolo skupinové fáze', '2. kolo skupinové fáze', '3. kolo skupinové fáze', 'Vyřazovací fáze'];
+    const SECTION_ORDER = [
+      '1. kolo skupinové fáze', '2. kolo skupinové fáze', '3. kolo skupinové fáze',
+      'Kolo 32', 'Osmifinále', 'Čtvrtfinále', 'Semifinále', 'Finále',
+    ];
 
     function render() {
       const filter = filterInput.value.trim().toLowerCase();
