@@ -261,7 +261,8 @@
     }
 
     let state = loadState();
-    let officialState = {};  // loaded from server, locks decided matches
+    let officialState = {};
+    let bracketGloballyLocked = false;
 
     // Resolve team name for a slot: walk up the tree following winners
     function resolveTeam(matchId, slot) {
@@ -415,7 +416,7 @@
     }
 
     function isMatchLocked(matchId) {
-      return !!officialState[matchId]?.winner;
+      return bracketGloballyLocked || !!officialState[matchId]?.winner;
     }
 
     // Merge official state into user state: official wins override user picks
@@ -500,12 +501,20 @@
     });
 
     // ── Init: load official state + user picks ────────────────────────
-    const [officialData, meData] = await Promise.allSettled([
+    const [officialData, meData, lockedData] = await Promise.allSettled([
       fetch('/api/bracket').then(r => r.json()),
       fetch('/api/me').then(r => r.json()),
+      fetch('/api/bracket/locked').then(r => r.json()),
     ]);
 
     officialState = officialData.status === 'fulfilled' ? (officialData.value || {}) : {};
+    bracketGloballyLocked = lockedData.status === 'fulfilled' ? (lockedData.value?.locked ?? false) : false;
+
+    if (bracketGloballyLocked && !viewMode) {
+      document.getElementById('bracketHint').innerHTML = '🔒 Pavouk je uzamčen — tipy nelze měnit.';
+      document.getElementById('btnReset').style.display = 'none';
+      saveBtn.style.display = 'none';
+    }
 
     if (viewMode) {
       // Zobrazení pavouka jiného uživatele — pouze pro čtení

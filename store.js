@@ -301,6 +301,20 @@ export async function getBracketPicks(userId) {
   return rows[0]?.picks ?? {};
 }
 
+export async function getAllBracketPicks() {
+  const { rows } = await pool.query(`SELECT user_id AS "userId", picks FROM bracket_picks`);
+  return rows;
+}
+
+export async function getBracketLocked() {
+  const { rows } = await pool.query(`SELECT bracket_locked FROM tournament_stats WHERE singleton = 1`);
+  return rows[0]?.bracket_locked ?? false;
+}
+
+export async function setBracketLocked(locked) {
+  await pool.query(`UPDATE tournament_stats SET bracket_locked = $1 WHERE singleton = 1`, [locked]);
+}
+
 export async function setBracketPicks(userId, picks) {
   await pool.query(
     `INSERT INTO bracket_picks (user_id, picks, updated_at)

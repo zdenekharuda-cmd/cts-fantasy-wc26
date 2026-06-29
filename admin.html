@@ -65,6 +65,7 @@
           <h2>Pavouk — oficiální výsledky</h2>
           <p style="margin:2px 0 0;font-size:0.85rem;color:#666;">Kliknutím na tým nastavíte oficiálního postupujícího. Zamkne daný zápas uživatelům.</p>
         </div>
+        <button id="btnLockBracket" style="padding:6px 14px;border-radius:6px;border:1px solid #b2dfdb;background:#fff;cursor:pointer;font-size:0.85rem;color:#1b4332;">…</button>
       </div>
       <div id="bracketMsg" style="margin-bottom:8px;font-size:0.85rem;"></div>
       <div style="overflow-x:auto;padding-bottom:12px;">
@@ -562,6 +563,48 @@
         bState = await api('/api/admin/bracket') || {};
       } catch { bState = {}; }
       renderBracket();
+
+      // ── Bracket lock toggle ───────────────────────────────────────────
+      const lockBtn = document.getElementById('btnLockBracket');
+      let bracketLocked = false;
+
+      function updateLockBtn() {
+        if (bracketLocked) {
+          lockBtn.textContent = '🔓 Odemknout pavouk';
+          lockBtn.style.borderColor = '#c62828';
+          lockBtn.style.color = '#c62828';
+        } else {
+          lockBtn.textContent = '🔒 Zamknout pavouk';
+          lockBtn.style.borderColor = '#b2dfdb';
+          lockBtn.style.color = '#1b4332';
+        }
+      }
+
+      try {
+        const ls = await fetch('/api/bracket/locked').then(r => r.json());
+        bracketLocked = ls.locked ?? false;
+      } catch {}
+      updateLockBtn();
+
+      lockBtn.addEventListener('click', async () => {
+        const newLocked = !bracketLocked;
+        const label = newLocked ? 'Zamknout pavouk pro všechny uživatele?' : 'Odemknout pavouk?';
+        if (!confirm(label)) return;
+        lockBtn.disabled = true;
+        try {
+          await api('/api/admin/bracket/lock', { method: 'POST', body: { locked: newLocked } });
+          bracketLocked = newLocked;
+          updateLockBtn();
+          bracketMsg.style.color = '#2e7d32';
+          bracketMsg.textContent = newLocked ? '🔒 Pavouk uzamčen.' : '🔓 Pavouk odemčen.';
+          setTimeout(() => { bracketMsg.textContent = ''; }, 3000);
+        } catch (e) {
+          bracketMsg.style.color = '#c62828';
+          bracketMsg.textContent = 'Chyba: ' + e.message;
+        } finally {
+          lockBtn.disabled = false;
+        }
+      });
     }
   </script>
 </body>

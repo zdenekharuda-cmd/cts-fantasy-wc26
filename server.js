@@ -13,11 +13,12 @@ import {
   getGroupTeams, getTournamentPicks, getAllTournamentPicks, saveTournamentPicks, saveScorerPick, saveAssisterPick,
   getTipsByMatch, getTopScorer, getTopAssister,
   getBracketOfficial, setBracketOfficial,
-  getBracketPicks, setBracketPicks,
+  getBracketPicks, setBracketPicks, getAllBracketPicks, getBracketLocked, setBracketLocked,
   getScoreboardSnapshot, saveScoreboardSnapshot,
   getScoreboardDelta, saveScoreboardDelta
 } from './store.js';
 import { calculateTipPoints, isMatchFinished } from './scoring.js';
+import { computeBracketScore } from './bracketScoring.js';
 import { syncOpenFootball } from './syncOpenFootball.js';
 import { syncResults } from './syncResults.js';
 
@@ -478,6 +479,10 @@ app.get('/api/bracket', async (req, res) => {
   res.json(await getBracketOfficial());
 });
 
+app.get('/api/bracket/locked', async (req, res) => {
+  res.json({ locked: await getBracketLocked() });
+});
+
 app.get('/api/bracket/picks', requireAuth, async (req, res) => {
   res.json(await getBracketPicks(req.session.userId));
 });
@@ -493,12 +498,21 @@ app.post('/api/bracket/picks', requireAuth, async (req, res) => {
   if (typeof picks !== 'object' || Array.isArray(picks)) {
     return res.status(400).json({ error: 'Invalid picks.' });
   }
+  if (await getBracketLocked()) {
+    return res.status(423).json({ error: 'Pavouk je uzamčen.' });
+  }
   await setBracketPicks(req.session.userId, picks);
   res.json({ ok: true });
 });
 
 app.get('/api/admin/bracket', requireAdmin, async (req, res) => {
   res.json(await getBracketOfficial());
+});
+
+app.post('/api/admin/bracket/lock', requireAdmin, async (req, res) => {
+  const locked = !!req.body.locked;
+  await setBracketLocked(locked);
+  res.json({ ok: true, locked });
 });
 
 app.post('/api/admin/bracket', requireAdmin, async (req, res) => {
@@ -512,12 +526,12 @@ app.post('/api/admin/bracket', requireAdmin, async (req, res) => {
 
 // Helper: compute current sorted ranking [ { userId, totalPoints, exactScores, nickname } ]
 async function computeRanking() {
-  const [users, matches, tips, topScorer, topAssister, tournamentPicks] = await Promise.all([
-    getAllUsers(), getAllMatches(), getAllTips(), getTopScorer(), getTopAssister(), getAllTournamentPicks()
+  const [users, matches, tips, topScorer, topAssister, tournamentPicks, officialBracket, allBracketPicks] = await Promise.all([
+    getAllUsers(), getAllMatches(), getAllTips(), getTopScorer(), getTopAssister(), getAllTournamentPicks(),
+    getBracketOfficial(), getAllBracketPicks()
   ]);
-  const finishedMatches = matches.filter(isMatchFinished);
   const matchById = new Map(matches.map(m => [Number(m.id), m]));
-  const pickByUser = new Map(tournamentPicks.map(p => [p.userId, p]));
+  const bracketPicksByUser = new Map(allBracketPicks.map(p => [p.userId, p.picks]));
 
   return users.map(user => {
     const userTips = tips.filter(t => t.userId === user.id);
@@ -531,7 +545,9 @@ async function computeRanking() {
       if (base === 3) exactScores++;
       if (tip.bonusPlayer && Array.isArray(match.czechScorers) && match.czechScorers.includes(tip.bonusPlayer)) totalPoints += 2;
     }
-    return { userId: user.id, nickname: user.nickname, totalPoints, exactScores };
+    const userBracketPicks = bracketPicksByUser.get(user.id) || {};
+    const { points: bracketPoints } = computeBracketScore(userBracketPicks, officialBracket);
+    return { userId: user.id, nickname: user.nickname, totalPoints, exactScores, bracketPoints };
   }).sort((a, b) => b.totalPoints - a.totalPoints || b.exactScores - a.exactScores || a.nickname.localeCompare(b.nickname));
 }
 
