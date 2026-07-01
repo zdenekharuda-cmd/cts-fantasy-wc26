@@ -276,15 +276,18 @@ const SCORER_BONUS_POINTS = 5;
 const ASSISTER_BONUS_POINTS = 5;
 
 app.get('/api/scoreboard', async (req, res) => {
-  const [users, matches, tips, topScorer, topAssister, tournamentPicks, delta] = await Promise.all([
+  const [users, matches, tips, topScorer, topAssister, tournamentPicks, delta, officialBracket, allBracketPicks] = await Promise.all([
     getAllUsers(),
     getAllMatches(),
     getAllTips(),
     getTopScorer(),
     getTopAssister(),
     getAllTournamentPicks(),
-    getScoreboardDelta()
+    getScoreboardDelta(),
+    getBracketOfficial(),
+    getAllBracketPicks()
   ]);
+  const bracketPicksByUser = new Map(allBracketPicks.map(p => [p.userId, p.picks]));
 
   const finishedMatches = matches.filter(isMatchFinished);
   const matchById = new Map(matches.map((match) => [Number(match.id), match]));
@@ -315,7 +318,8 @@ app.get('/api/scoreboard', async (req, res) => {
     const potentialPoints = (scorerHit ? SCORER_BONUS_POINTS : 0) + (assisterHit ? ASSISTER_BONUS_POINTS : 0);
 
     const rankDelta = delta[user.id] ?? null;
-    return { userId: user.id, name: user.name, nickname: user.nickname, totalPoints, exactScores, scoredTips, potentialPoints, scorerHit, assisterHit, rankDelta };
+    const { points: bracketPoints } = computeBracketScore(bracketPicksByUser.get(user.id) || {}, officialBracket);
+    return { userId: user.id, name: user.name, nickname: user.nickname, totalPoints, exactScores, scoredTips, potentialPoints, scorerHit, assisterHit, rankDelta, bracketPoints };
   });
 
   rows.sort((a, b) => {
