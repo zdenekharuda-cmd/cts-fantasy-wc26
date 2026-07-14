@@ -53,6 +53,7 @@
               <th>Přesné výsledky</th>
               <th>Vyhodnocených tipů</th>
               <th title="Body za správný tip na nejlepšího střelce (+5 b) a asistenta (+5 b) turnaje">Potenciální body</th>
+              <th title="Body za správné tipy v pavouku">Pavouk</th>
               <th></th>
             </tr>
           </thead>
@@ -108,10 +109,11 @@
           <td>${user.exactScores}</td>
           <td>${user.scoredTips}</td>
           ${potCell}
+          <td class="points">${user.bracketPoints ?? '—'}</td>
           <td><button class="btn-bracket" data-bracket-btn data-user-id="${user.userId}" data-nickname="${escapeHtml(user.nickname)}">🕸 Pavouk</button></td>
         </tr>
         <tr class="detail-row" id="detail-${user.userId}" style="display:none">
-          <td colspan="8" class="detail-cell">
+          <td colspan="9" class="detail-cell">
             <div class="detail-loading">Načítám...</div>
           </td>
         </tr>`;
