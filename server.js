@@ -316,6 +316,7 @@ app.get('/api/scoreboard', async (req, res) => {
     const scorerHit = !!(topScorer && pick?.scorerPlayer && topScorer.players.includes(pick.scorerPlayer));
     const assisterHit = !!(topAssister && pick?.assisterPlayer && topAssister.players.includes(pick.assisterPlayer));
     const potentialPoints = (scorerHit ? SCORER_BONUS_POINTS : 0) + (assisterHit ? ASSISTER_BONUS_POINTS : 0);
+    totalPoints += potentialPoints;
 
     const rankDelta = delta[user.id] ?? null;
     const { points: bracketPoints } = computeBracketScore(bracketPicksByUser.get(user.id) || {}, officialBracket);
@@ -537,6 +538,8 @@ async function computeRanking() {
   const matchById = new Map(matches.map(m => [Number(m.id), m]));
   const bracketPicksByUser = new Map(allBracketPicks.map(p => [p.userId, p.picks]));
 
+  const pickByUser = new Map(tournamentPicks.map(p => [p.userId, p]));
+
   return users.map(user => {
     const userTips = tips.filter(t => t.userId === user.id);
     let totalPoints = 0, exactScores = 0;
@@ -549,6 +552,10 @@ async function computeRanking() {
       if (base === 3) exactScores++;
       if (tip.bonusPlayer && Array.isArray(match.czechScorers) && match.czechScorers.includes(tip.bonusPlayer)) totalPoints += 2;
     }
+    const pick = pickByUser.get(user.id);
+    const scorerHit = !!(topScorer && pick?.scorerPlayer && topScorer.players.includes(pick.scorerPlayer));
+    const assisterHit = !!(topAssister && pick?.assisterPlayer && topAssister.players.includes(pick.assisterPlayer));
+    totalPoints += (scorerHit ? SCORER_BONUS_POINTS : 0) + (assisterHit ? ASSISTER_BONUS_POINTS : 0);
     const userBracketPicks = bracketPicksByUser.get(user.id) || {};
     const { points: bracketPoints } = computeBracketScore(userBracketPicks, officialBracket);
     return { userId: user.id, nickname: user.nickname, totalPoints, exactScores, bracketPoints };
