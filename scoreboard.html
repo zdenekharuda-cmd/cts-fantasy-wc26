@@ -35,6 +35,13 @@
     <nav class="nav" data-nav></nav>
   </header>
   <main class="container">
+    <div class="winner-banner" id="winnerBanner" style="display:none">
+      <img src="/images/ORA.png" alt="ORA" />
+      <div>
+        <div class="winner-banner-title">🏆 Vítěz turnaje</div>
+        <div class="winner-banner-name" id="winnerBannerName"></div>
+      </div>
+    </div>
     <section class="card card--wide">
       <div class="toolbar">
         <div>
@@ -84,6 +91,14 @@
     async function load() {
       const data = await api('/api/scoreboard');
       const { topScorer, topAssister } = data;
+
+      const banner = document.getElementById('winnerBanner');
+      if (data.tournamentOver && data.users.length) {
+        document.getElementById('winnerBannerName').textContent = data.users[0].nickname;
+        banner.style.display = '';
+      } else {
+        banner.style.display = 'none';
+      }
       const fmtLeaders = (players) => players.map(escapeHtml).join(', ');
       const scorerInfo = topScorer ? ` &nbsp;·&nbsp; ⚽ Střelec: <b>${fmtLeaders(topScorer.players)}</b> (${topScorer.goals} gólů)` : '';
       const assisterInfo = topAssister ? ` &nbsp;·&nbsp; 🎯 Asistent: <b>${fmtLeaders(topAssister.players)}</b> (${topAssister.assists} asistencí)` : '';

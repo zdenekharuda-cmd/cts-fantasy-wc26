@@ -329,7 +329,8 @@ app.get('/api/scoreboard', async (req, res) => {
     return a.nickname.localeCompare(b.nickname);
   });
 
-  res.json({ finishedMatches: finishedMatches.length, users: rows, topScorer, topAssister });
+  const tournamentOver = matches.length > 0 && finishedMatches.length === matches.length;
+  res.json({ finishedMatches: finishedMatches.length, tournamentOver, users: rows, topScorer, topAssister });
 });
 
 app.post('/api/tips/:matchId/bonus', requireAuth, async (req, res) => {

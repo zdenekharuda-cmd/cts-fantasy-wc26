@@ -917,6 +917,41 @@ a:hover {
   color: #4f6f52;
 }
 
+.winner-banner {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  background: linear-gradient(135deg, #e8f5e9, #c8e6c9);
+  border: 2px solid #66bb6a;
+  border-radius: 16px;
+  padding: 16px 24px;
+  margin-bottom: 20px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
+}
+
+.winner-banner img {
+  width: 72px;
+  height: 72px;
+  object-fit: cover;
+  border-radius: 50%;
+  border: 3px solid #2e7d32;
+  flex-shrink: 0;
+}
+
+.winner-banner-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: #2e7d32;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.winner-banner-name {
+  font-size: 28px;
+  font-weight: 800;
+  color: #1b5e20;
+}
+
 /* Mobile layout */
 @media (max-width: 800px) {
   .topbar {
