@@ -125,6 +125,7 @@ body {
 .pot-badge { display: inline-block; font-size: 0.8rem; font-weight: 700; padding: 2px 7px; border-radius: 10px; margin-right: 4px; }
 .pot-badge.scorer  { background: #d5f5e3; color: #1e6e3e; }
 .pot-badge.assister { background: #d6eaf8; color: #1a5276; }
+.pot-badge.placement { background: #fdebd0; color: #9c640c; }
 
 .card {
   background: white;

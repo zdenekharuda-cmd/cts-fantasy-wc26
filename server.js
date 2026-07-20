@@ -274,6 +274,10 @@ app.delete('/api/tips/:matchId/captain', requireAuth, async (req, res) => {
 
 const SCORER_BONUS_POINTS = 5;
 const ASSISTER_BONUS_POINTS = 5;
+const PLACEMENT_BONUS_POINTS = 5;
+const OFFICIAL_FIRST_TEAM = 'Spain';
+const OFFICIAL_SECOND_TEAM = 'Argentina';
+const OFFICIAL_THIRD_TEAM = 'England';
 
 app.get('/api/scoreboard', async (req, res) => {
   const [users, matches, tips, topScorer, topAssister, tournamentPicks, delta, officialBracket, allBracketPicks] = await Promise.all([
@@ -318,9 +322,15 @@ app.get('/api/scoreboard', async (req, res) => {
     const potentialPoints = (scorerHit ? SCORER_BONUS_POINTS : 0) + (assisterHit ? ASSISTER_BONUS_POINTS : 0);
     totalPoints += potentialPoints;
 
+    const firstHit = !!(pick?.firstTeam && pick.firstTeam === OFFICIAL_FIRST_TEAM);
+    const secondHit = !!(pick?.secondTeam && pick.secondTeam === OFFICIAL_SECOND_TEAM);
+    const thirdHit = !!(pick?.thirdTeam && pick.thirdTeam === OFFICIAL_THIRD_TEAM);
+    const placementPoints = (firstHit ? PLACEMENT_BONUS_POINTS : 0) + (secondHit ? PLACEMENT_BONUS_POINTS : 0) + (thirdHit ? PLACEMENT_BONUS_POINTS : 0);
+    totalPoints += placementPoints;
+
     const rankDelta = delta[user.id] ?? null;
     const { points: bracketPoints } = computeBracketScore(bracketPicksByUser.get(user.id) || {}, officialBracket);
-    return { userId: user.id, name: user.name, nickname: user.nickname, totalPoints, exactScores, scoredTips, potentialPoints, scorerHit, assisterHit, rankDelta, bracketPoints };
+    return { userId: user.id, name: user.name, nickname: user.nickname, totalPoints, exactScores, scoredTips, potentialPoints, scorerHit, assisterHit, firstHit, secondHit, thirdHit, placementPoints, rankDelta, bracketPoints };
   });
 
   rows.sort((a, b) => {
@@ -557,6 +567,10 @@ async function computeRanking() {
     const scorerHit = !!(topScorer && pick?.scorerPlayer && topScorer.players.includes(pick.scorerPlayer));
     const assisterHit = !!(topAssister && pick?.assisterPlayer && topAssister.players.includes(pick.assisterPlayer));
     totalPoints += (scorerHit ? SCORER_BONUS_POINTS : 0) + (assisterHit ? ASSISTER_BONUS_POINTS : 0);
+    const firstHit = !!(pick?.firstTeam && pick.firstTeam === OFFICIAL_FIRST_TEAM);
+    const secondHit = !!(pick?.secondTeam && pick.secondTeam === OFFICIAL_SECOND_TEAM);
+    const thirdHit = !!(pick?.thirdTeam && pick.thirdTeam === OFFICIAL_THIRD_TEAM);
+    totalPoints += (firstHit ? PLACEMENT_BONUS_POINTS : 0) + (secondHit ? PLACEMENT_BONUS_POINTS : 0) + (thirdHit ? PLACEMENT_BONUS_POINTS : 0);
     const userBracketPicks = bracketPicksByUser.get(user.id) || {};
     const { points: bracketPoints } = computeBracketScore(userBracketPicks, officialBracket);
     return { userId: user.id, nickname: user.nickname, totalPoints, exactScores, bracketPoints };

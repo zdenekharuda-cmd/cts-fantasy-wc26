@@ -111,6 +111,9 @@
         const badges = [
           user.scorerHit ? '<span class="pot-badge scorer">⚽ +5</span>' : '',
           user.assisterHit ? '<span class="pot-badge assister">🎯 +5</span>' : '',
+          user.firstHit ? '<span class="pot-badge placement">🥇 +5</span>' : '',
+          user.secondHit ? '<span class="pot-badge placement">🥈 +5</span>' : '',
+          user.thirdHit ? '<span class="pot-badge placement">🥉 +5</span>' : '',
         ].filter(Boolean).join('');
         const potCell = badges
           ? `<td class="potential-cell">${badges}</td>`
